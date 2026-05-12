@@ -46,8 +46,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
 }
 
 fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: tauri::menu::MenuEvent) {
+    use tauri::Emitter;
     match event.id.as_ref() {
-        "open" | "settings" => show_main(app),
+        "open" => show_main(app),
+        "settings" => {
+            show_main(app);
+            // Route the main window to the settings view. The frontend
+            // listens for `settings:open` and flips its view state.
+            let _ = app.emit("settings:open", ());
+        }
         "pause" => {
             if let Err(err) = state::set(app, AtlasState::Paused) {
                 log::warn!("failed to set paused: {err:#}");

@@ -44,6 +44,40 @@ pub fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+#[derive(serde::Serialize)]
+pub struct AppInfo {
+    pub version: String,
+    pub target_os: String,
+    pub target_arch: String,
+    pub debug: bool,
+}
+
+#[tauri::command]
+pub fn app_info() -> AppInfo {
+    AppInfo {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        target_os: std::env::consts::OS.to_string(),
+        target_arch: std::env::consts::ARCH.to_string(),
+        debug: cfg!(debug_assertions),
+    }
+}
+
+/// Wipe voice prefs, audit log marker (Phase 14 lands the real log), and
+/// reset onboarding so the user lands back in the wizard. Does **not** touch
+/// remote-side artifacts (cloned voices on ElevenLabs, conversation history
+/// on their dashboard) — surface those instructions to the user separately.
+#[tauri::command]
+pub fn settings_reset_all_data<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    crate::voice::preferences::reset(&app).map_err(|e| e.to_string())?;
+    // Best-effort: close any in-flight voice session so it doesn't keep using
+    // the now-stale voice_id.
+    if let Some(voice) = app.try_state::<crate::voice::VoiceHandle>() {
+        voice.send_command(crate::voice::ClientCommand::Close);
+    }
+    log::info!("settings: all local data reset");
+    Ok(())
+}
+
 /// Debug-only: simulate the wake event so the rest of the voice loop can be
 /// exercised before a wakeword model is configured. Wired in `lib.rs` only
 /// when `debug_assertions` is on, so it's stripped from release builds.

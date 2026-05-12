@@ -18,7 +18,9 @@
 
 mod capture;
 mod client;
+pub mod ivc;
 mod playback;
+pub mod preferences;
 mod protocol;
 
 use anyhow::{anyhow, Context, Result};
@@ -145,7 +147,7 @@ async fn start_session<R: Runtime>(
     // Set up channels + claim the active-session slot. All work that touches
     // the `tauri::State` borrow happens in this block; the borrow ends at the
     // block's close, before we await anything.
-    let (tx, rx, callbacks, config) = {
+    let (tx, rx, callbacks, mut config) = {
         let voice = app
             .try_state::<VoiceHandle>()
             .ok_or_else(|| anyhow!("voice handle not managed"))?;
@@ -164,6 +166,18 @@ async fn start_session<R: Runtime>(
         let config = voice.config_template.clone();
         (tx, rx, callbacks, config)
     };
+
+    // Inject the user's chosen voice_id (Phase 0.F). If none is configured,
+    // the agent's dashboard default (ADR 0016 — Adam) is used.
+    if let Ok(prefs) = preferences::read(&app) {
+        if let Some(voice_id) = prefs.voice_id.as_deref() {
+            config.conversation_config_override = Some(merge_voice_override(
+                config.conversation_config_override.take(),
+                voice_id,
+            ));
+            log::debug!("voice: session voice_id override = {voice_id}");
+        }
+    }
 
     // Spawn the mic capture on a dedicated OS thread. cpal::Stream is !Send
     // on Linux ALSA, so we cannot hold the AgentCapture across an await on
@@ -227,6 +241,52 @@ async fn start_session<R: Runtime>(
 fn clear_voice_tx<R: Runtime>(app: &AppHandle<R>) {
     if let Some(voice) = app.try_state::<VoiceHandle>() {
         *voice.active_session_tx.lock() = None;
+    }
+}
+
+/// Merge a `tts.voice_id` override into the existing
+/// `conversation_config_override` value. Preserves any other overrides the
+/// caller already set.
+fn merge_voice_override(existing: Option<Value>, voice_id: &str) -> Value {
+    use serde_json::Map;
+    let mut root = match existing {
+        Some(Value::Object(m)) => m,
+        _ => Map::new(),
+    };
+    let mut tts = match root.remove("tts") {
+        Some(Value::Object(m)) => m,
+        _ => Map::new(),
+    };
+    tts.insert("voice_id".to_string(), Value::String(voice_id.to_string()));
+    root.insert("tts".to_string(), Value::Object(tts));
+    Value::Object(root)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn voice_override_into_empty_config() {
+        let merged = merge_voice_override(None, "v_abc");
+        assert_eq!(merged, json!({"tts": {"voice_id": "v_abc"}}));
+    }
+
+    #[test]
+    fn voice_override_preserves_other_keys() {
+        let existing = json!({
+            "tts": {"speed": 1.2},
+            "language": "en"
+        });
+        let merged = merge_voice_override(Some(existing), "v_abc");
+        assert_eq!(
+            merged,
+            json!({
+                "tts": {"speed": 1.2, "voice_id": "v_abc"},
+                "language": "en"
+            })
+        );
     }
 }
 

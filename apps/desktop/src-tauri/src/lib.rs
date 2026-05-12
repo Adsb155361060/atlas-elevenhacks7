@@ -96,6 +96,13 @@ fn run_inner() -> Result<()> {
             commands::hide_main_window,
             commands::quit_app,
             commands::app_version,
+            commands::voice_prefs_get,
+            commands::voice_prefs_set,
+            commands::voice_prefs_reset,
+            commands::voice_onboarding_complete,
+            commands::voice_list_stock,
+            commands::voice_record_and_clone,
+            commands::voice_upload_and_clone,
             #[cfg(debug_assertions)]
             commands::fire_wake_test,
             #[cfg(debug_assertions)]

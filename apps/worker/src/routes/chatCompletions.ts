@@ -108,10 +108,12 @@ chatCompletions.post('/', async (c) => {
   const id = generateChatCompletionId();
   const created = Math.floor(Date.now() / 1000);
 
-  let upstream: AsyncIterable<Awaited<ReturnType<typeof streamMessages>> extends AsyncIterable<infer E> ? E : never>;
+  type UpstreamIter = Awaited<ReturnType<typeof streamMessages>>;
+  let upstream: UpstreamIter;
   try {
-    upstream = streamMessages(c.env, params);
+    upstream = await streamMessages(c.env, params);
   } catch (err) {
+    console.error('anthropic upstream open failed:', err);
     return c.json(
       {
         error: {

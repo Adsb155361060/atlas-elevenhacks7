@@ -28,7 +28,7 @@
     "tts": {
       "$comment_tts": "Default to Flash v2.5 for low TTFA; voice_id swapped to user's IVC during onboarding (Phase 0.F). 'Adam' as dev default (ADR 0016).",
       "voice_id": "pNInz6obpgDQGcFmaJgB",
-      "model_id": "eleven_flash_v2_5",
+      "model_id": "eleven_flash_v2",
       "stability": 0.5,
       "similarity_boost": 0.85,
       "speed": 1.0,

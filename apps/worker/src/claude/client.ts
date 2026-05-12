@@ -23,17 +23,18 @@ export function getAnthropicClient(env: Env): Anthropic {
 /**
  * Begin a streaming Messages request and return the raw event iterable.
  * Caller is responsible for translating events into the wire shape it needs.
+ *
+ * SDK v0.95+ returns `APIPromise<Stream<…>>` from `messages.create` — i.e.
+ * we have to `await` to get the iterable. The HTTP request is still in flight
+ * by the time we await; the await just resolves the API-call envelope.
  */
-export function streamMessages(
+export async function streamMessages(
   env: Env,
   params: Anthropic.Messages.MessageCreateParamsStreaming,
   init?: { signal?: AbortSignal },
-): AsyncIterable<Anthropic.Messages.RawMessageStreamEvent> {
+): Promise<AsyncIterable<Anthropic.Messages.RawMessageStreamEvent>> {
   const client = getAnthropicClient(env);
   const opts: Anthropic.RequestOptions = {};
   if (init?.signal) opts.signal = init.signal;
-  // The SDK returns a Stream<...> which is itself AsyncIterable.
-  return client.messages.create(params, opts) as unknown as AsyncIterable<
-    Anthropic.Messages.RawMessageStreamEvent
-  >;
+  return client.messages.create(params, opts);
 }

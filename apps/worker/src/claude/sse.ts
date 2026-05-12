@@ -42,8 +42,11 @@ export async function* anthropicStreamToOpenAISSE(
   let nextToolIndex = 0;
   let stopReason: AnthropicStopReason | null = null;
   let emittedFirstChunk = false;
+  let sawEvents = 0;
 
-  for await (const event of stream) {
+  try {
+    for await (const event of stream) {
+      sawEvents++;
     switch (event.type) {
       case 'message_start': {
         // Initial role marker (OpenAI streams send the role on the first chunk).
@@ -142,8 +145,26 @@ export async function* anthropicStreamToOpenAISSE(
         // forward-compat without crashes is the right default.
         break;
     }
+    }
+  } catch (err) {
+    console.error('anthropic stream error after', sawEvents, 'events:', err);
+    yield sseChunk(opts, {
+      delta: {
+        content:
+          err instanceof Error
+            ? `[upstream error: ${err.message}]`
+            : '[upstream error]',
+      },
+      finish_reason: null,
+    });
+    yield sseChunk(opts, { delta: {}, finish_reason: 'stop' });
+    yield 'data: [DONE]\n\n';
+    return;
   }
 
+  if (sawEvents === 0) {
+    console.warn('anthropic stream produced no events');
+  }
   // Stream ended without an explicit message_stop (rare; cancelled connection).
   yield sseChunk(opts, {
     delta: {},

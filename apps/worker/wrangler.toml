@@ -1,0 +1,37 @@
+name = "atlas-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-15"
+compatibility_flags = ["nodejs_compat"]
+
+# Set via `wrangler secret put NAME` — never in this file:
+#   ANTHROPIC_API_KEY
+#   ELEVENLABS_API_KEY
+#   GEMINI_API_KEY
+#   VOYAGE_API_KEY
+#   BRAVE_SEARCH_API_KEY
+#   ALLOWED_AGENT_TOKENS
+
+[vars]
+WORKER_VERSION = "0.0.1"
+DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"
+ROUTER_TOOL_MODEL = "claude-sonnet-4-6"
+ROUTER_TRIAGE_MODEL = "claude-haiku-4-5-20251001"
+DAILY_ANTHROPIC_BUDGET_USD = "20"
+LOG_LEVEL = "info"
+
+# Observability: enable workers analytics + tail logs
+[observability]
+enabled = true
+
+# Routes added at deploy time:
+#   atlas-worker.<your-subdomain>.workers.dev (default)
+#   or a custom route on a Cloudflare-managed domain
+
+# KV / R2 bindings reserved for later phases (artifact storage, blob cache):
+# [[kv_namespaces]]
+# binding = "ARTIFACT_KV"
+# id = "TBD"
+#
+# [[r2_buckets]]
+# binding = "BLOBS"
+# bucket_name = "atlas-blobs"

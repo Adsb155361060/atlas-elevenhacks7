@@ -24,12 +24,13 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     let open = MenuItem::with_id(app, "open", "Open Atlas", true, None::<&str>)?;
     let pause = MenuItem::with_id(app, "pause", "Pause listening", true, None::<&str>)?;
     let resume = MenuItem::with_id(app, "resume", "Resume listening", true, None::<&str>)?;
+    let mini = MenuItem::with_id(app, "mini", "Toggle mini overlay", true, None::<&str>)?;
     let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit Atlas", true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
-        &[&open, &pause, &resume, &settings, &separator, &quit],
+        &[&open, &pause, &resume, &mini, &settings, &separator, &quit],
     )?;
 
     TrayIconBuilder::with_id(TRAY_ID)
@@ -57,7 +58,20 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, event: tauri::menu::MenuEve
                 log::warn!("failed to resume: {err:#}");
             }
         }
+        "mini" => {
+            if let Err(err) = crate::mini::toggle(app) {
+                log::warn!("mini toggle failed: {err:#}");
+            }
+        }
         "quit" => {
+            // Phase 0.G keeps the quit path simple: log a warning if there's
+            // an in-flight voice session and exit anyway. The Phase 0.H
+            // settings panel will add a proper confirmation dialog.
+            if let Some(voice) = app.try_state::<crate::voice::VoiceHandle>() {
+                if voice.active_session_tx.lock().is_some() {
+                    log::warn!("quit: voice session active — exiting anyway");
+                }
+            }
             log::info!("quit from tray");
             app.exit(0);
         }

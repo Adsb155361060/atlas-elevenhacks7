@@ -4,6 +4,8 @@
 //! exercised by `cargo test` without spawning a window.
 
 mod commands;
+mod hotkey;
+mod mini;
 mod state;
 mod tray;
 mod voice;
@@ -57,9 +59,21 @@ fn run_inner() -> Result<()> {
                 .context("tray::build")
                 .map_err(boxed)?;
 
-            // Window starts hidden — surfaces on tray click or wake event.
+            // Main + mini windows both start hidden. Main surfaces on tray
+            // click; mini via the tray "Toggle mini overlay" menu entry or
+            // the `toggle_mini_window` Tauri command.
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.hide();
+            }
+            if let Some(window) = app.get_webview_window(mini::MINI_LABEL) {
+                let _ = window.hide();
+            }
+
+            // Global push-to-talk hotkey (Phase 0.G). Same effect as the wake
+            // word: fires the wake:fired event + transitions state. Works
+            // when the on-device wake detector is missing/paused.
+            if let Err(err) = hotkey::register(app.handle()) {
+                log::error!("hotkey: registration failed: {err:#}");
             }
 
             // Wake-word detection (Phase 0.D). Graceful: logs a warning and
@@ -103,6 +117,7 @@ fn run_inner() -> Result<()> {
             commands::voice_list_stock,
             commands::voice_record_and_clone,
             commands::voice_upload_and_clone,
+            commands::toggle_mini_window,
             #[cfg(debug_assertions)]
             commands::fire_wake_test,
             #[cfg(debug_assertions)]

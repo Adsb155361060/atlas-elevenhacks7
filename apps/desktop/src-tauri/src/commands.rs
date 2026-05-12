@@ -50,7 +50,13 @@ pub fn app_version() -> String {
 #[cfg(debug_assertions)]
 #[tauri::command]
 pub fn fire_wake_test<R: Runtime>(app: AppHandle<R>) {
-    crate::wake::fire_wake_test(&app);
+    crate::wake::fire_wake_externally(&app);
+}
+
+/// Toggle visibility of the mini overlay window (Phase 0.G).
+#[tauri::command]
+pub fn toggle_mini_window<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    crate::mini::toggle(&app).map_err(|e| e.to_string())
 }
 
 /// Debug-only: queue a `user_message` text frame into the active voice

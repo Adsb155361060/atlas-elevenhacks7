@@ -125,14 +125,15 @@ fn spawn_pause_watcher<R: Runtime>(app: &AppHandle<R>, paused: Arc<AtomicBool>) 
     });
 }
 
-/// Debug-only entry point that simulates the wake event for end-to-end
-/// development before a wakeword file is in place. Wired to the
-/// `fire_wake_test` Tauri command behind `#[cfg(debug_assertions)]`.
-pub fn fire_wake_test<R: Runtime>(app: &AppHandle<R>) {
-    log::info!("wake: simulated wake (fire_wake_test)");
+/// Fire a wake event from somewhere other than the on-device detector — the
+/// global push-to-talk hotkey (Phase 0.G) and the debug `fire_wake_test`
+/// command both call this. Emits `wake:fired` and transitions to `Armed`,
+/// which the voice orchestrator picks up to start a session.
+pub fn fire_wake_externally<R: Runtime>(app: &AppHandle<R>) {
+    log::info!("wake: external trigger");
     use tauri::Emitter;
-    let _ = app.emit("wake:fired", "test");
+    let _ = app.emit("wake:fired", "external");
     if let Err(err) = state::set(app, AtlasState::Armed) {
-        log::warn!("fire_wake_test: state transition failed: {err:#}");
+        log::warn!("fire_wake_externally: state transition failed: {err:#}");
     }
 }

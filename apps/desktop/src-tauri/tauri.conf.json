@@ -24,6 +24,24 @@
         "visible": false,
         "fullscreen": false,
         "center": true
+      },
+      {
+        "label": "mini",
+        "title": "Atlas (mini)",
+        "url": "index.html?mode=mini",
+        "width": 320,
+        "height": 96,
+        "minWidth": 220,
+        "minHeight": 72,
+        "maxWidth": 480,
+        "maxHeight": 160,
+        "decorations": false,
+        "transparent": true,
+        "resizable": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "visible": false,
+        "shadow": false
       }
     ],
     "security": {

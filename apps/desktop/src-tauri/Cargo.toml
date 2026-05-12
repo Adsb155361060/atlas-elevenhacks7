@@ -32,6 +32,13 @@ log = "0.4"
 livekit-wakeword = "0.1"
 cpal = "0.15"
 crossbeam-channel = "0.5"
+# Voice loop — WebSocket to ElevenLabs Conversational Agent (Phase 0.E)
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-native-roots"] }
+futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
+base64 = "0.22"
+parking_lot = "0.12"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+url = "2"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

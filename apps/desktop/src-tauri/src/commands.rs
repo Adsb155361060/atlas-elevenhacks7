@@ -45,10 +45,18 @@ pub fn app_version() -> String {
 }
 
 /// Debug-only: simulate the wake event so the rest of the voice loop can be
-/// exercised before Picovoice is configured. Wired in `lib.rs` only when
-/// `debug_assertions` is on, so it's stripped from release builds.
+/// exercised before a wakeword model is configured. Wired in `lib.rs` only
+/// when `debug_assertions` is on, so it's stripped from release builds.
 #[cfg(debug_assertions)]
 #[tauri::command]
 pub fn fire_wake_test<R: Runtime>(app: AppHandle<R>) {
     crate::wake::fire_wake_test(&app);
+}
+
+/// Debug-only: queue a `user_message` text frame into the active voice
+/// session. Useful for testing the agent loop without speaking.
+#[cfg(debug_assertions)]
+#[tauri::command]
+pub fn send_user_message_test<R: Runtime>(app: AppHandle<R>, text: String) {
+    crate::voice::send_test_user_message(&app, &text);
 }

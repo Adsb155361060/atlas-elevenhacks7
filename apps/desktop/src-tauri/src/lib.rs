@@ -6,6 +6,7 @@
 mod commands;
 mod state;
 mod tray;
+mod voice;
 mod wake;
 
 use anyhow::{Context, Result};
@@ -62,7 +63,7 @@ fn run_inner() -> Result<()> {
             }
 
             // Wake-word detection (Phase 0.D). Graceful: logs a warning and
-            // continues if the Picovoice key or .ppn isn't configured.
+            // continues if the wakeword model file isn't configured.
             match wake::start_if_configured(app.handle()) {
                 Ok(Some(handle)) => {
                     app.manage(handle);
@@ -70,6 +71,19 @@ fn run_inner() -> Result<()> {
                 }
                 Ok(None) => {} // already logged inside
                 Err(err) => log::error!("wake init failed: {err:#}"),
+            }
+
+            // Voice loop (Phase 0.E). Graceful: logs a warning and continues
+            // when ATLAS_AGENT_ID is missing. Subscribes to `wake:fired` and
+            // starts one ElevenLabs Conv-AI WebSocket session per wake.
+            match voice::start_if_configured(app.handle()) {
+                Ok(Some(handle)) => {
+                    app.manage(handle);
+                    voice::spawn_pause_watcher(app.handle());
+                    log::info!("voice: loop active");
+                }
+                Ok(None) => {} // already logged inside
+                Err(err) => log::error!("voice init failed: {err:#}"),
             }
 
             log::info!("atlas-desktop started");
@@ -84,6 +98,8 @@ fn run_inner() -> Result<()> {
             commands::app_version,
             #[cfg(debug_assertions)]
             commands::fire_wake_test,
+            #[cfg(debug_assertions)]
+            commands::send_user_message_test,
         ])
         .run(tauri::generate_context!())
         .map_err(anyhow::Error::from)

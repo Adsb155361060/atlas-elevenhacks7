@@ -1,0 +1,107 @@
+{
+  "$comment": "Reference body for POST https://api.elevenlabs.io/v1/convai/agents/create. Suitable as the input to scripts/create-agent.sh. The dashboard 'Test AI Agent' button uses the same fields. After deploying the Worker, replace the {{...}} placeholders. Anything you don't want to set is omitted; ElevenLabs defaults take over.",
+  "name": "Atlas Dev",
+  "tags": ["atlas", "dev", "v0.0.1"],
+  "conversation_config": {
+    "agent": {
+      "$comment_agent": "First message + system prompt + LLM config + language settings.",
+      "prompt": {
+        "$comment_prompt": "System prompt content. Paste the body of packages/prompts/system_v1.md here. The {{system__time}}, {{system__timezone}}, {{user_name}} dynamic vars are resolved by ElevenLabs at conversation start.",
+        "prompt": "<PASTE_BODY_OF_packages/prompts/system_v1.md>",
+        "llm": "custom-llm",
+        "temperature": 0.6,
+        "max_tokens": -1,
+        "tools": [],
+        "tool_ids": [],
+        "knowledge_base": [],
+        "rag": { "enabled": false }
+      },
+      "first_message": "Hey {{user_name}} — what's up?",
+      "language": "en",
+      "dynamic_variables": {
+        "dynamic_variable_placeholders": {
+          "user_name": "there",
+          "user_locale": "en-US"
+        }
+      }
+    },
+    "tts": {
+      "$comment_tts": "Default to Flash v2.5 for low TTFA; voice_id swapped to user's IVC during onboarding (Phase 0.F). 'Adam' as dev default (ADR 0016).",
+      "voice_id": "pNInz6obpgDQGcFmaJgB",
+      "model_id": "eleven_flash_v2_5",
+      "stability": 0.5,
+      "similarity_boost": 0.85,
+      "speed": 1.0,
+      "supported_voices": []
+    },
+    "asr": {
+      "$comment_asr": "Scribe v2 Realtime — 150ms STT with multilingual + atypical-speech support.",
+      "quality": "high",
+      "provider": "elevenlabs",
+      "user_input_audio_format": "pcm_16000",
+      "keywords": ["Atlas"]
+    },
+    "conversation": {
+      "$comment_conversation": "Realtime voice loop client events. Custom-LLM metadata enabled so the Worker can pipe debug info back to the desktop.",
+      "max_duration_seconds": 1800,
+      "client_events": [
+        "audio",
+        "interruption",
+        "user_transcript",
+        "agent_response",
+        "agent_response_correction",
+        "agent_response_metadata",
+        "client_tool_call",
+        "agent_tool_response",
+        "vad_score"
+      ],
+      "text_only": false
+    },
+    "turn": {
+      "$comment_turn": "Normal eagerness for general conversation; turn_timeout 10s; mode 'turn' (server-side VAD) preferred for desktop mic. Soft timeout 3.0s with static filler — Flash v2.5 + Claude usually returns first token < 800ms so filler will rarely fire.",
+      "turn_timeout": 10,
+      "silence_end_call_timeout": -1,
+      "mode": "turn",
+      "turn_eagerness": "normal"
+    },
+    "soft_timeout": {
+      "enabled": true,
+      "timeout_seconds": 3.0,
+      "static_message": "Mhm — give me a sec.",
+      "llm_generated_message_enabled": false
+    }
+  },
+  "platform_settings": {
+    "auth": {
+      "$comment_auth": "Allow desktop client to start sessions without server-side auth in dev. In production, use signed-URL flow (apps/desktop calls Worker → Worker calls ElevenLabs convai/conversation/get-signed-url with API key → returns short-lived URL to desktop).",
+      "enable_auth": false
+    },
+    "evaluation": {
+      "$comment_evaluation": "Phase 0 — no formal evaluation criteria yet. Add in Phase 1 once the eval suite exists.",
+      "criteria": []
+    },
+    "widget": {
+      "$comment_widget": "We don't use the web widget; conversation is via direct WebSocket from the Tauri desktop in Phase 0.E.",
+      "variant": "compact"
+    },
+    "safety": {
+      "$comment_safety": "Mute toggle, end-call tool both available in case Phase 11 proactive features need them.",
+      "is_blocked_ivc": false,
+      "is_blocked_non_ivc": false,
+      "ignore_safety_evaluation": false
+    },
+    "privacy": {
+      "$comment_privacy": "Retain audio for now during dev/beta for debugging real failures; flip to no-retention before public launch.",
+      "record_voice": true,
+      "retention_days": 7,
+      "delete_transcript_and_pii": false,
+      "delete_audio": false,
+      "apply_to_existing_conversations": false
+    },
+    "call_limits": {
+      "$comment_call_limits": "Free-form cost guardrails enforced by Atlas-side rate limiter; ElevenLabs side keeps generous defaults.",
+      "agent_concurrency_limit": -1,
+      "daily_limit": 5000
+    }
+  }
+}

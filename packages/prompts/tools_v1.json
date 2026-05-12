@@ -1,0 +1,8 @@
+{
+  "$schema": "../contracts/schema/tool-bundle.schema.json",
+  "version": "v1",
+  "description": "Tools exposed to the Conversational Agent. Empty in Phase 0.B; tools land in Phase 1. Regenerated from packages/contracts/src/tools/ via `pnpm gen:tools` once the contracts package is fleshed out.",
+  "client_tools": [],
+  "server_tools": [],
+  "mcp_tools": []
+}

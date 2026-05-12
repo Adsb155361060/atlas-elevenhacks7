@@ -7,6 +7,7 @@ import { create } from 'zustand';
  */
 export type AtlasUIState =
   | 'idle'
+  | 'armed'
   | 'listening'
   | 'thinking'
   | 'speaking'
@@ -14,6 +15,7 @@ export type AtlasUIState =
 
 const UI_STATES: readonly AtlasUIState[] = [
   'idle',
+  'armed',
   'listening',
   'thinking',
   'speaking',

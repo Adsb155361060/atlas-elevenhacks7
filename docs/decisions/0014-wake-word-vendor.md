@@ -1,7 +1,7 @@
 # 0014 — Wake-word vendor: Picovoice Porcupine
 
 - Date: 2026-05-12
-- Status: Accepted
+- Status: **Superseded by ADR 0019** (2026-05-13) — Picovoice has no current Rust binding; switched to rustpotter.
 
 ## Context
 

@@ -6,6 +6,7 @@
 mod commands;
 mod state;
 mod tray;
+mod wake;
 
 use anyhow::{Context, Result};
 use tauri::Manager;
@@ -60,6 +61,17 @@ fn run_inner() -> Result<()> {
                 let _ = window.hide();
             }
 
+            // Wake-word detection (Phase 0.D). Graceful: logs a warning and
+            // continues if the Picovoice key or .ppn isn't configured.
+            match wake::start_if_configured(app.handle()) {
+                Ok(Some(handle)) => {
+                    app.manage(handle);
+                    log::info!("wake: detection active");
+                }
+                Ok(None) => {} // already logged inside
+                Err(err) => log::error!("wake init failed: {err:#}"),
+            }
+
             log::info!("atlas-desktop started");
             Ok(())
         })
@@ -70,6 +82,8 @@ fn run_inner() -> Result<()> {
             commands::hide_main_window,
             commands::quit_app,
             commands::app_version,
+            #[cfg(debug_assertions)]
+            commands::fire_wake_test,
         ])
         .run(tauri::generate_context!())
         .map_err(anyhow::Error::from)

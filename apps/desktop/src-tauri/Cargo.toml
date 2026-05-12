@@ -28,6 +28,10 @@ anyhow = "1"
 thiserror = "2"
 tokio = { version = "1", features = ["sync", "rt-multi-thread", "macros"] }
 log = "0.4"
+# Wake-word detection (Phase 0.D; ADR 0019)
+livekit-wakeword = "0.1"
+cpal = "0.15"
+crossbeam-channel = "0.5"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

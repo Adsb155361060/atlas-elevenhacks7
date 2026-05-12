@@ -19,10 +19,17 @@ use tokio::sync::watch;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AtlasState {
+    /// Background — no active conversation.
     Idle,
+    /// Wake fired; agent WebSocket connecting. Brief transitional state.
+    Armed,
+    /// Mic streaming to ElevenLabs Scribe v2.
     Listening,
+    /// Worker / Claude composing the reply.
     Thinking,
+    /// Flash v2.5 audio streaming back to the user.
     Speaking,
+    /// Wake detection disabled by user; only push-to-talk works.
     Paused,
 }
 
@@ -30,6 +37,7 @@ impl AtlasState {
     pub fn as_str(&self) -> &'static str {
         match self {
             AtlasState::Idle => "idle",
+            AtlasState::Armed => "armed",
             AtlasState::Listening => "listening",
             AtlasState::Thinking => "thinking",
             AtlasState::Speaking => "speaking",
@@ -40,6 +48,7 @@ impl AtlasState {
     pub fn parse(value: &str) -> Option<Self> {
         match value {
             "idle" => Some(AtlasState::Idle),
+            "armed" => Some(AtlasState::Armed),
             "listening" => Some(AtlasState::Listening),
             "thinking" => Some(AtlasState::Thinking),
             "speaking" => Some(AtlasState::Speaking),
@@ -84,6 +93,7 @@ mod tests {
     fn round_trip_string_repr() {
         for s in [
             AtlasState::Idle,
+            AtlasState::Armed,
             AtlasState::Listening,
             AtlasState::Thinking,
             AtlasState::Speaking,

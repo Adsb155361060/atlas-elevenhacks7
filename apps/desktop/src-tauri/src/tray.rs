@@ -3,15 +3,22 @@
 //! Tray icon presents the conversational state at a glance and provides a
 //! menu for the rare moments the user wants to interact via mouse. Left-click
 //! the icon to open the main window; right-click for the menu.
+//!
+//! The icon hot-swaps when `AtlasState` changes — a tokio task subscribes to
+//! the state watch channel and rewrites `set_icon` + `set_tooltip` per state.
 
 use anyhow::Result;
 use tauri::{
+    image::Image,
+    include_image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     AppHandle, Manager, Runtime,
 };
 
-use crate::state::{self, AtlasState};
+use crate::state::{self, AtlasState, StateChannel};
+
+pub const TRAY_ID: &str = "main-tray";
 
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
     let open = MenuItem::with_id(app, "open", "Open Atlas", true, None::<&str>)?;
@@ -25,14 +32,15 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
         &[&open, &pause, &resume, &settings, &separator, &quit],
     )?;
 
-    TrayIconBuilder::with_id("main-tray")
-        .tooltip("Atlas — idle")
+    TrayIconBuilder::with_id(TRAY_ID)
+        .tooltip(tooltip_for(AtlasState::Idle))
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_menu_event(handle_menu_event)
         .on_tray_icon_event(handle_tray_event)
         .build(app)?;
 
+    spawn_state_watcher(app);
     Ok(())
 }
 
@@ -74,4 +82,61 @@ fn show_main<R: Runtime>(app: &AppHandle<R>) {
         let _ = window.unminimize();
         let _ = window.set_focus();
     }
+}
+
+// ───────────────────────── state → icon ─────────────────────────
+
+fn icon_for(state: AtlasState) -> Image<'static> {
+    // `include_image!` resolves paths relative to the crate root (src-tauri/),
+    // not the source file. So we drop the `..` prefix used by `include_bytes!`.
+    match state {
+        AtlasState::Idle => include_image!("icons/tray-idle.png"),
+        // Armed visually equals Listening — the wake just fired; treat both as
+        // "active" so the user sees an immediate response on wake.
+        AtlasState::Armed | AtlasState::Listening => {
+            include_image!("icons/tray-listening.png")
+        }
+        AtlasState::Thinking => include_image!("icons/tray-thinking.png"),
+        AtlasState::Speaking => include_image!("icons/tray-speaking.png"),
+        AtlasState::Paused => include_image!("icons/tray-paused.png"),
+    }
+}
+
+fn tooltip_for(state: AtlasState) -> String {
+    match state {
+        AtlasState::Idle => "Atlas — idle".into(),
+        AtlasState::Armed => "Atlas — armed".into(),
+        AtlasState::Listening => "Atlas — listening".into(),
+        AtlasState::Thinking => "Atlas — thinking".into(),
+        AtlasState::Speaking => "Atlas — speaking".into(),
+        AtlasState::Paused => "Atlas — paused".into(),
+    }
+}
+
+fn apply_state<R: Runtime>(app: &AppHandle<R>, state: AtlasState) {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return;
+    };
+    if let Err(err) = tray.set_icon(Some(icon_for(state))) {
+        log::warn!("tray set_icon failed: {err}");
+    }
+    if let Err(err) = tray.set_tooltip(Some(tooltip_for(state))) {
+        log::warn!("tray set_tooltip failed: {err}");
+    }
+}
+
+fn spawn_state_watcher<R: Runtime>(app: &AppHandle<R>) {
+    let channel = app.state::<StateChannel>();
+    let mut rx = channel.rx.clone();
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let state = *rx.borrow();
+            apply_state(&app, state);
+            if rx.changed().await.is_err() {
+                break;
+            }
+        }
+        log::debug!("tray state watcher exited");
+    });
 }

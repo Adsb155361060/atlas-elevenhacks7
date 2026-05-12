@@ -5,6 +5,7 @@ import { StatusDot } from './components/StatusDot';
 
 const PROMPT_BY_STATE: Record<AtlasUIState, string> = {
   idle: "Hold Super+Space or say 'Hey Atlas' to begin",
+  armed: 'Connecting…',
   listening: 'Listening…',
   thinking: 'Thinking…',
   speaking: 'Speaking…',

@@ -43,3 +43,12 @@ pub fn quit_app<R: Runtime>(app: AppHandle<R>) {
 pub fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
+
+/// Debug-only: simulate the wake event so the rest of the voice loop can be
+/// exercised before Picovoice is configured. Wired in `lib.rs` only when
+/// `debug_assertions` is on, so it's stripped from release builds.
+#[cfg(debug_assertions)]
+#[tauri::command]
+pub fn fire_wake_test<R: Runtime>(app: AppHandle<R>) {
+    crate::wake::fire_wake_test(&app);
+}

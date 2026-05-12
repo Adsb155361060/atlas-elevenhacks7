@@ -29,8 +29,10 @@ apps/desktop/dist/
 *.pem
 *.key
 
-# Picovoice / voice samples / private audio
+# Wake-word artifacts / voice samples / private audio
 **/*.ppn
+**/*.rpw
+apps/desktop/src-tauri/resources/wake/*.onnx
 samples/
 recordings/
 

@@ -6,6 +6,7 @@ interface Props {
 
 const colorByState: Record<AtlasUIState, string> = {
   idle: 'bg-slate-700',
+  armed: 'bg-sky-500',
   listening: 'bg-emerald-500',
   thinking: 'bg-amber-500',
   speaking: 'bg-violet-500',
@@ -14,6 +15,7 @@ const colorByState: Record<AtlasUIState, string> = {
 
 const pulseByState: Record<AtlasUIState, string> = {
   idle: '',
+  armed: 'animate-ping',
   listening: 'animate-pulse',
   thinking: 'animate-pulse',
   speaking: 'animate-pulse',

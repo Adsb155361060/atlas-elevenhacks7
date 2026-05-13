@@ -371,6 +371,94 @@
       margin-left: 2px;
     }
 
+    /* ─── Feature channels (cockpit instrument-bay) ──────────────────────── */
+    .channels {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0;
+      border-top: 1px solid var(--hair-strong);
+      border-bottom: 1px solid var(--hair-strong);
+    }
+    @media (max-width: 1100px) { .channels { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 720px) { .channels { grid-template-columns: 1fr; } }
+    .channel {
+      padding: 32px 24px 36px;
+      border-right: 1px solid var(--hair);
+      position: relative;
+    }
+    .channel:last-child { border-right: none; }
+    @media (max-width: 1100px) {
+      .channel { border-right: 1px solid var(--hair); border-bottom: 1px solid var(--hair); }
+      .channel:nth-child(3n) { border-right: none; }
+    }
+    @media (max-width: 720px) {
+      .channel { border-right: none; border-bottom: 1px solid var(--hair); }
+      .channel:last-child { border-bottom: none; }
+    }
+    .channel-head {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      padding-bottom: 18px;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--brass);
+    }
+    .channel-num {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: var(--brass);
+      text-transform: uppercase;
+    }
+    .channel-name {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      font-style: italic;
+      font-weight: 300;
+      font-variation-settings: 'opsz' 60, 'SOFT' 30;
+      letter-spacing: -0.015em;
+      color: var(--cream);
+      line-height: 1;
+    }
+    .feature-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .feature {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      gap: 10px;
+      align-items: baseline;
+    }
+    .feature-idx {
+      font-family: var(--font-mono);
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      color: var(--cream-faint);
+      padding-top: 2px;
+    }
+    .feature-name {
+      font-family: var(--font-serif);
+      font-size: 14px;
+      font-style: italic;
+      font-weight: 300;
+      font-variation-settings: 'opsz' 36, 'SOFT' 30;
+      color: var(--cream);
+      line-height: 1.25;
+    }
+    .feature-detail {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--cream-mute);
+      margin-top: 4px;
+      letter-spacing: 0.04em;
+      line-height: 1.4;
+    }
+
     /* ─── How it works ───────────────────────────────────────────────────── */
     .steps {
       display: grid;
@@ -562,6 +650,7 @@
     </div>
     <nav class="nav-links">
       <a href="#what">What it does</a>
+      <a href="#features">Features</a>
       <a href="#how">How</a>
       <a href="#download">Download</a>
       <a href="https://github.com/compiler-aditya/atlas-elevenhacks7" target="_blank" rel="noreferrer">Repo</a>
@@ -722,10 +811,288 @@
       </div>
     </section>
 
+    <!-- ─── Every feature ──────────────────────────────────────────────── -->
+    <section class="section" id="features">
+      <div class="section-head">
+        <div class="label label-brass">§02 · Every feature</div>
+        <h2>Five channels. <span class="accent">Thirty-odd verbs.</span></h2>
+      </div>
+      <div class="channels">
+        <div class="channel">
+          <div class="channel-head">
+            <span class="channel-num">CH 01</span>
+            <span class="channel-name">Hear</span>
+          </div>
+          <ul class="feature-list">
+            <li class="feature">
+              <span class="feature-idx">01</span>
+              <div>
+                <div class="feature-name">Wake word</div>
+                <div class="feature-detail">"Hey Atlas" — on-device, livekit-wakeword</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">02</span>
+              <div>
+                <div class="feature-name">Push-to-talk hotkey</div>
+                <div class="feature-detail">⌘⇧A &nbsp;·&nbsp; Ctrl⇧A</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">03</span>
+              <div>
+                <div class="feature-name">Real-time speech-to-text</div>
+                <div class="feature-detail">ElevenLabs Scribe v2 Realtime</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">04</span>
+              <div>
+                <div class="feature-name">Real-time text-to-speech</div>
+                <div class="feature-detail">ElevenLabs Flash v2 · sub-second latency</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">05</span>
+              <div>
+                <div class="feature-name">Voice cloning</div>
+                <div class="feature-detail">Stock, record 60s, or upload sample</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">06</span>
+              <div>
+                <div class="feature-name">Conversation memory</div>
+                <div class="feature-detail">Short-horizon context across turns</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="channel">
+          <div class="channel-head">
+            <span class="channel-num">CH 02</span>
+            <span class="channel-name">See</span>
+          </div>
+          <ul class="feature-list">
+            <li class="feature">
+              <span class="feature-idx">01</span>
+              <div>
+                <div class="feature-name">Screen vision</div>
+                <div class="feature-detail">"What's wrong with this error?"</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">02</span>
+              <div>
+                <div class="feature-name">Camera vision</div>
+                <div class="feature-detail">Hold up an object, get an answer</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">03</span>
+              <div>
+                <div class="feature-name">Live web search</div>
+                <div class="feature-detail">Brave Search · current weather, news</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">04</span>
+              <div>
+                <div class="feature-name">File search</div>
+                <div class="feature-detail">Spotlight (mdfind) — "find my résumé"</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">05</span>
+              <div>
+                <div class="feature-name">Calendar today</div>
+                <div class="feature-detail">Reads your day's events</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="channel">
+          <div class="channel-head">
+            <span class="channel-num">CH 03</span>
+            <span class="channel-name">Make</span>
+          </div>
+          <ul class="feature-list">
+            <li class="feature">
+              <span class="feature-idx">01</span>
+              <div>
+                <div class="feature-name">Music generation</div>
+                <div class="feature-detail">ElevenLabs Music API · plays inline</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">02</span>
+              <div>
+                <div class="feature-name">Image generation</div>
+                <div class="feature-detail">Gemini Imagen · "draw a fox in moonlight"</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">03</span>
+              <div>
+                <div class="feature-name">Markdown</div>
+                <div class="feature-detail">Headings, code, blockquotes, tables</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">04</span>
+              <div>
+                <div class="feature-name">Syntax-highlighted code</div>
+                <div class="feature-detail">react-syntax-highlighter</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">05</span>
+              <div>
+                <div class="feature-name">Charts</div>
+                <div class="feature-detail">Recharts · line, bar, brass palette</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">06</span>
+              <div>
+                <div class="feature-name">Maps</div>
+                <div class="feature-detail">Leaflet · pins, popups, OSM tiles</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">07</span>
+              <div>
+                <div class="feature-name">Tables &amp; tutorials</div>
+                <div class="feature-detail">Stepped walkthroughs · sortable data</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="channel">
+          <div class="channel-head">
+            <span class="channel-num">CH 04</span>
+            <span class="channel-name">Act</span>
+          </div>
+          <ul class="feature-list">
+            <li class="feature">
+              <span class="feature-idx">01</span>
+              <div>
+                <div class="feature-name">App launcher</div>
+                <div class="feature-detail">Fuzzy match across /Applications</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">02</span>
+              <div>
+                <div class="feature-name">Music control</div>
+                <div class="feature-detail">Apple Music · Spotify · play/pause/next</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">03</span>
+              <div>
+                <div class="feature-name">Open path</div>
+                <div class="feature-detail">Any file, folder, or URL</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">04</span>
+              <div>
+                <div class="feature-name">Clipboard read &amp; write</div>
+                <div class="feature-detail">"Copy this code" · "Read my clipboard"</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">05</span>
+              <div>
+                <div class="feature-name">System actions</div>
+                <div class="feature-detail">Volume · brightness · sleep</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">06</span>
+              <div>
+                <div class="feature-name">Timers</div>
+                <div class="feature-detail">Floating card · brass progress · chime</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">07</span>
+              <div>
+                <div class="feature-name">Notes</div>
+                <div class="feature-detail">Local store · take and list</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <div class="channel">
+          <div class="channel-head">
+            <span class="channel-num">CH 05</span>
+            <span class="channel-name">Hold</span>
+          </div>
+          <ul class="feature-list">
+            <li class="feature">
+              <span class="feature-idx">01</span>
+              <div>
+                <div class="feature-name">Local-first state</div>
+                <div class="feature-detail">~/.config/com.atlas.desktop/</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">02</span>
+              <div>
+                <div class="feature-name">Privacy wipe</div>
+                <div class="feature-detail">One button · clears prefs + memory</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">03</span>
+              <div>
+                <div class="feature-name">Voice picker in Settings</div>
+                <div class="feature-detail">Swap any time · next session uses it</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">04</span>
+              <div>
+                <div class="feature-name">Wake toggle</div>
+                <div class="feature-detail">Pause listening · hotkey still works</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">05</span>
+              <div>
+                <div class="feature-name">Mini mode</div>
+                <div class="feature-detail">Floating always-on-top orb</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">06</span>
+              <div>
+                <div class="feature-name">First-run tutorial</div>
+                <div class="feature-detail">Eight capabilities, one screen</div>
+              </div>
+            </li>
+            <li class="feature">
+              <span class="feature-idx">07</span>
+              <div>
+                <div class="feature-name">Rate-limited worker</div>
+                <div class="feature-detail">200 req/day per IP · fair use</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
     <!-- ─── How it works ───────────────────────────────────────────────── -->
     <section class="section" id="how">
       <div class="section-head">
-        <div class="label label-brass">§02 · The flow</div>
+        <div class="label label-brass">§03 · The flow</div>
         <h2>Three steps. <span class="accent">No setup.</span></h2>
       </div>
       <div class="steps">
@@ -761,7 +1128,7 @@
     <!-- ─── Download ────────────────────────────────────────────────────── -->
     <section class="section" id="download">
       <div class="section-head">
-        <div class="label label-brass">§03 · Download</div>
+        <div class="label label-brass">§04 · Download</div>
         <h2>Pick a platform. <span class="accent">Talk in two minutes.</span></h2>
       </div>
       <div class="downloads">
@@ -807,7 +1174,7 @@
     <!-- ─── Stack ──────────────────────────────────────────────────────── -->
     <section class="section">
       <div class="section-head">
-        <div class="label label-brass">§04 · Stack</div>
+        <div class="label label-brass">§05 · Stack</div>
         <h2>Built on <span class="accent">good plumbing.</span></h2>
       </div>
       <div class="stack">

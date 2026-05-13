@@ -7,6 +7,7 @@ mod commands;
 mod hotkey;
 mod mini;
 mod state;
+mod tools;
 mod tray;
 mod voice;
 mod wake;

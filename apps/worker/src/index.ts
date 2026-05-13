@@ -8,6 +8,7 @@ import { parseEnv, type Env } from './env.js';
 import { healthz } from './routes/healthz.js';
 import { chatCompletions } from './routes/chatCompletions.js';
 import { voices } from './routes/voices.js';
+import { tools } from './routes/tools.js';
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -35,6 +36,7 @@ app.use('*', async (c, next) => {
 app.route('/healthz', healthz);
 app.route('/v1/chat/completions', chatCompletions);
 app.route('/v1/voices', voices);
+app.route('/v1/tools', tools);
 
 app.notFound((c) =>
   c.json(

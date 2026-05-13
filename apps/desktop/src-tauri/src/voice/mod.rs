@@ -370,26 +370,42 @@ impl<R: Runtime> SessionCallbacks for OrchestratorCallbacks<R> {
         tool_call_id: &str,
         parameters: &HashMap<String, Value>,
     ) {
-        // Phase 1+ will register real client tools. For now we reply with an
-        // "unknown tool" error so the agent can move on.
-        log::warn!(
-            "voice: client_tool_call '{tool_name}' not handled in Phase 0.E; returning error"
-        );
-        if let Some(voice) = self.app.try_state::<VoiceHandle>() {
-            voice.send_command(ClientCommand::SendToolResult {
-                tool_call_id: tool_call_id.to_string(),
-                result: format!("Unknown tool: {tool_name}"),
-                is_error: true,
-            });
-        }
+        // Convert the HashMap into a single Value so the tools dispatcher can
+        // accept arbitrarily-shaped param payloads (objects, arrays, primitives).
+        let params_value = Value::Object(parameters.clone().into_iter().collect());
+        log::info!("voice: client_tool_call name={tool_name} id={tool_call_id}");
+
+        // Surface to the frontend regardless of dispatch outcome — useful for
+        // a debug HUD or future telemetry. Drops `parameters` deliberately
+        // (potentially large or sensitive) — frontend can re-derive from
+        // `atlas:artifact` if it needs the actual payload.
         let _ = self.app.emit(
             "voice:client_tool_call",
             serde_json::json!({
                 "tool_name": tool_name,
                 "tool_call_id": tool_call_id,
-                "parameters": parameters,
             }),
         );
+
+        let outcome = crate::tools::dispatch(&self.app, tool_name, &params_value);
+
+        if let Some(voice) = self.app.try_state::<VoiceHandle>() {
+            // Encode the result Value as a JSON string for the agent —
+            // ElevenLabs Conv-AI expects `result: string`. Pretty-printing it
+            // is fine; the LLM tolerates whitespace.
+            let result_str = match serde_json::to_string(&outcome.result) {
+                Ok(s) => s,
+                Err(err) => {
+                    log::warn!("tools: serialize result failed: {err}");
+                    format!("{{\"error\": \"serialize failed: {err}\"}}")
+                }
+            };
+            voice.send_command(ClientCommand::SendToolResult {
+                tool_call_id: tool_call_id.to_string(),
+                result: result_str,
+                is_error: outcome.is_error,
+            });
+        }
     }
 
     fn on_session_end(&self) {

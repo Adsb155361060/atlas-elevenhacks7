@@ -21,7 +21,7 @@ mod open_path;
 mod render_artifact;
 mod system_action;
 mod timer;
-mod vision_qa;
+pub mod vision_qa;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

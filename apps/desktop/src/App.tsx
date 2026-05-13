@@ -9,11 +9,13 @@ import { useView } from './state/view';
 import { useArtifact } from './state/artifact';
 import { getPrefs } from './ipc/voice-prefs';
 import { subscribeToArtifacts } from './ipc/artifact';
+import { subscribeToCameraCaptures } from './ipc/camera';
 import { StatusDot } from './components/StatusDot';
 import { CaptionStrip } from './components/CaptionStrip';
 import { Onboarding } from './components/Onboarding';
 import { Settings } from './components/Settings';
 import { ArtifactSurface } from './components/Artifact';
+import { TimerStack } from './components/TimerStack';
 
 const PROMPT_BY_STATE: Record<AtlasUIState, string> = {
   idle: "Hold Super+Space or say 'Hey Atlas' to begin",
@@ -77,12 +79,18 @@ export function App() {
       unlistenArtifacts = fn;
     });
 
+    let unlistenCamera: (() => void) | undefined;
+    subscribeToCameraCaptures().then((fn) => {
+      unlistenCamera = fn;
+    });
+
     return () => {
       unlistenState?.();
       unlistenTranscripts?.();
       unlistenSessionEnd?.();
       unlistenSettingsOpen?.();
       unlistenArtifacts?.();
+      unlistenCamera?.();
     };
   }, [setState, ingestTranscript, clearTranscripts, setView, ingestArtifact, clearArtifacts]);
 
@@ -139,6 +147,7 @@ export function App() {
       </div>
 
       <CaptionStrip />
+      <TimerStack />
     </main>
   );
 }

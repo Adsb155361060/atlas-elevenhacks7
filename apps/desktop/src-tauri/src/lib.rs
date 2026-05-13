@@ -122,6 +122,7 @@ fn run_inner() -> Result<()> {
             commands::voice_record_and_clone,
             commands::voice_upload_and_clone,
             commands::toggle_mini_window,
+            commands::vision_camera_deliver,
             commands::app_info,
             commands::settings_reset_all_data,
             #[cfg(debug_assertions)]

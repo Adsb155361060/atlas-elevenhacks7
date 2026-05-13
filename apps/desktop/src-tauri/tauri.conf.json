@@ -47,6 +47,7 @@
     "security": {
       "csp": null
     },
+    "macOSPrivateApi": false,
     "trayIcon": {
       "id": "main-tray",
       "iconPath": "icons/tray-idle.png",

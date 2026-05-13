@@ -94,6 +94,19 @@ pub fn toggle_mini_window<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     crate::mini::toggle(&app).map_err(|e| e.to_string())
 }
 
+/// Frontend delivers a camera frame back to the vision bridge. Called in
+/// response to the `atlas:vision:capture_camera` event emitted by
+/// `vision_qa::capture_camera`.
+#[tauri::command]
+pub fn vision_camera_deliver<R: Runtime>(
+    _app: AppHandle<R>,
+    request_id: String,
+    base64_png: String,
+) -> Result<(), String> {
+    crate::tools::vision_qa::deliver_camera_capture(&request_id, &base64_png)
+        .map_err(|e| e.to_string())
+}
+
 /// Debug-only: queue a `user_message` text frame into the active voice
 /// session. Useful for testing the agent loop without speaking.
 #[cfg(debug_assertions)]

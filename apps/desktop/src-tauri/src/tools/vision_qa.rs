@@ -1,82 +1,91 @@
-//! `vision_qa` client tool — Claude reads what's on your screen.
+//! `vision_qa` client tool — Claude reads what's on your screen or
+//! what's in front of your camera.
 //!
 //! Flow (when the agent calls vision_qa({question, source?})):
-//!   1. Capture a screenshot of the primary display.
-//!      - macOS: `screencapture -x -t png` (system binary; no entitlements).
-//!      - Linux: `grim` (Wayland) → `scrot` (X11) → fail with a clear message.
-//!      - Windows: not wired for hackathon V1; returns is_error.
-//!   2. POST the PNG bytes + question to Worker `/v1/tools/vision_qa` as
+//!   1. Capture an image:
+//!      - `source: "screen"` (default) — runs an OS-level capture
+//!        (`screencapture` on macOS, `grim`/`scrot` on Linux).
+//!      - `source: "camera"` — emits `atlas:vision:capture_camera` to
+//!        the webview, which calls `getUserMedia` + canvas to snap a
+//!        frame and delivers it back via the `vision_camera_deliver`
+//!        Tauri command. Bridge via an in-process oneshot map.
+//!   2. POST PNG + question to Worker `/v1/tools/vision_qa` as
 //!      multipart. Worker forwards to Anthropic vision and returns
 //!      `{answer, model}`.
-//!   3. Return the answer text to the agent via client_tool_result. The
-//!      agent reads it aloud.
-//!
-//! Camera is intentionally out of scope for V1 — needs a webview path
-//! through getUserMedia + MediaStreamTrack. Phase 3+.
+//!   3. Return the answer text to the agent via client_tool_result.
 
 use anyhow::{anyhow, Context, Result};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use parking_lot::Mutex;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use std::process::Command;
+use std::collections::HashMap;
+use std::sync::OnceLock;
+use std::time::Duration;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::process::Command;
-use tauri::{AppHandle, Runtime};
+use tauri::{AppHandle, Emitter, Runtime};
 use tokio::runtime::Handle;
+use tokio::sync::oneshot;
 
 use super::ToolResult;
 
 #[derive(Debug, Deserialize)]
 struct VisionInput {
     question: String,
-    /// Reserved for future camera path. Defaults to "screen".
+    /// `screen` (default) or `camera`.
     #[serde(default)]
     source: Option<String>,
 }
 
-pub fn execute<R: Runtime>(_app: &AppHandle<R>, parameters: &Value) -> ToolResult {
+pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult {
     let input: VisionInput = match serde_json::from_value(parameters.clone()) {
         Ok(v) => v,
         Err(err) => return ToolResult::err(format!("vision_qa: invalid parameters: {err}")),
     };
     let source = input.source.as_deref().unwrap_or("screen");
-    if source != "screen" {
-        return ToolResult::err(format!(
-            "vision_qa source '{source}' isn't supported yet — only 'screen'"
-        ));
-    }
 
-    let png = match capture_screen() {
-        Ok(bytes) => bytes,
-        Err(err) => return ToolResult::err(format!("vision_qa: capture failed: {err:#}")),
-    };
-    log::info!(
-        "vision_qa: captured {} bytes, calling worker with q='{}'",
-        png.len(),
-        truncate(&input.question, 80),
-    );
-
-    // Blocking → async bridge. The dispatcher runs on the tokio runtime
-    // already (per voice/mod.rs::on_client_tool_call), but tools::dispatch
-    // is sync. Use the current tokio handle to drive the upload.
     let handle = match Handle::try_current() {
         Ok(h) => h,
         Err(_) => return ToolResult::err("vision_qa: no tokio runtime available".to_string()),
     };
+
+    let png = match source {
+        "screen" => match capture_screen() {
+            Ok(b) => b,
+            Err(err) => return ToolResult::err(format!("vision_qa: capture screen: {err:#}")),
+        },
+        "camera" => match handle.block_on(capture_camera(app)) {
+            Ok(b) => b,
+            Err(err) => return ToolResult::err(format!("vision_qa: capture camera: {err:#}")),
+        },
+        other => {
+            return ToolResult::err(format!(
+                "vision_qa: source '{other}' invalid — use 'screen' or 'camera'"
+            ))
+        }
+    };
+    log::info!(
+        "vision_qa: source={source} bytes={} q='{}'",
+        png.len(),
+        truncate(&input.question, 80),
+    );
+
     let question = input.question.clone();
-    let result = handle.block_on(upload_and_answer(question, png));
-    match result {
-        Ok(answer) => ToolResult::ok(json!({ "answer": answer })),
+    match handle.block_on(upload_and_answer(question, png)) {
+        Ok(answer) => ToolResult::ok(json!({ "answer": answer, "source": source })),
         Err(err) => ToolResult::err(format!("vision_qa: {err:#}")),
     }
 }
 
-// ───────────────────────── capture per OS ─────────────────────────
+// ───────────────────────── screen capture per OS ─────────────────────────
 
 #[cfg(target_os = "macos")]
 fn capture_screen() -> Result<Vec<u8>> {
-    // `screencapture -x -t png -` writes PNG to stdout in modern macOS.
     let output = Command::new("/usr/sbin/screencapture")
-        .arg("-x") // silent — no shutter sound
+        .arg("-x")
         .arg("-t").arg("png")
-        .arg("-") // stdout
+        .arg("-")
         .output()
         .context("invoke screencapture")?;
     if !output.status.success() {
@@ -91,8 +100,6 @@ fn capture_screen() -> Result<Vec<u8>> {
 
 #[cfg(target_os = "linux")]
 fn capture_screen() -> Result<Vec<u8>> {
-    // Try Wayland (`grim`) then X11 (`scrot`). Both emit PNG to stdout
-    // with `-`.
     if let Ok(out) = Command::new("grim").arg("-").output() {
         if out.status.success() && !out.stdout.is_empty() {
             return Ok(out.stdout);
@@ -110,13 +117,79 @@ fn capture_screen() -> Result<Vec<u8>> {
 
 #[cfg(target_os = "windows")]
 fn capture_screen() -> Result<Vec<u8>> {
-    // Phase 3+. Stub returns a clear error so the agent apologises.
     Err(anyhow!("Windows screen capture isn't wired yet"))
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 fn capture_screen() -> Result<Vec<u8>> {
     Err(anyhow!("vision_qa: unsupported platform"))
+}
+
+// ───────────────────────── camera bridge ─────────────────────────
+//
+// Rust can't reach the webcam from inside a Tauri app without an extra
+// native plugin. The webview can — `getUserMedia` + a `<canvas>` snapshot
+// gives us PNG bytes. To bridge:
+//   1. Rust emits `atlas:vision:capture_camera` with a request_id.
+//   2. Frontend listens, captures a frame, base64-encodes it, calls the
+//      `vision_camera_deliver` Tauri command with the same request_id.
+//   3. That command resolves a pending tokio::sync::oneshot, freeing
+//      `capture_camera` to continue.
+//
+// A static `OnceLock<Mutex<HashMap<request_id, Sender<bytes>>>>` holds
+// the pending captures.
+
+type CameraBridge = Mutex<HashMap<String, oneshot::Sender<Vec<u8>>>>;
+
+fn bridge() -> &'static CameraBridge {
+    static BRIDGE: OnceLock<CameraBridge> = OnceLock::new();
+    BRIDGE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+async fn capture_camera<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<u8>> {
+    let request_id = format!("cam_{}", now_ms());
+    let (tx, rx) = oneshot::channel::<Vec<u8>>();
+    bridge().lock().insert(request_id.clone(), tx);
+
+    let _ = app.emit(
+        "atlas:vision:capture_camera",
+        json!({ "request_id": request_id }),
+    );
+
+    // 8s grace covers permission-prompt-on-first-use + stream-start.
+    match tokio::time::timeout(Duration::from_secs(8), rx).await {
+        Ok(Ok(bytes)) => {
+            if bytes.is_empty() {
+                Err(anyhow!("camera returned empty bytes"))
+            } else {
+                Ok(bytes)
+            }
+        }
+        Ok(Err(_)) => Err(anyhow!("camera response channel dropped")),
+        Err(_) => {
+            // Clean up the pending entry on timeout.
+            bridge().lock().remove(&request_id);
+            Err(anyhow!(
+                "camera capture timed out — did you grant camera permission?"
+            ))
+        }
+    }
+}
+
+/// Called from `commands::vision_camera_deliver`. Decodes the base64 PNG
+/// the frontend produced and routes it to the waiting oneshot. Returns
+/// `Ok(())` if the request id was found; `Err` otherwise.
+pub fn deliver_camera_capture(request_id: &str, base64_png: &str) -> Result<()> {
+    let bytes = STANDARD
+        .decode(base64_png.trim_start_matches("data:image/png;base64,").as_bytes())
+        .context("base64 decode camera bytes")?;
+    let tx = bridge()
+        .lock()
+        .remove(request_id)
+        .ok_or_else(|| anyhow!("no pending camera request for id '{request_id}'"))?;
+    tx.send(bytes)
+        .map_err(|_| anyhow!("oneshot receiver dropped before delivery"))?;
+    Ok(())
 }
 
 // ───────────────────────── worker upload ─────────────────────────
@@ -136,7 +209,7 @@ async fn upload_and_answer(question: String, image_png: Vec<u8>) -> Result<Strin
     );
 
     let part = reqwest::multipart::Part::bytes(image_png)
-        .file_name("screenshot.png")
+        .file_name("frame.png")
         .mime_str("image/png")
         .map_err(|e| anyhow!("invalid mime: {e}"))?;
     let form = reqwest::multipart::Form::new()
@@ -171,4 +244,11 @@ fn truncate(s: &str, max: usize) -> String {
         let cut: String = s.chars().take(max).collect();
         format!("{cut}…")
     }
+}
+
+fn now_ms() -> u128 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
 }

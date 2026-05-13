@@ -57,6 +57,15 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Path A — bake the four runtime config values into the binary.
+          # `build.rs` reads these and writes `bundled_config.rs`; the app
+          # hydrates `std::env` from them at startup. Judges install →
+          # talk, no setup. Worker rate-limit caps abuse.
+          # See README "For judges" + ADR-style note in commit history.
+          ATLAS_BAKED_WORKER_URL: ${{ secrets.BAKED_WORKER_URL }}
+          ATLAS_BAKED_AGENT_TOKEN: ${{ secrets.BAKED_AGENT_TOKEN }}
+          ATLAS_BAKED_AGENT_ID: ${{ secrets.BAKED_AGENT_ID }}
+          ATLAS_BAKED_ELEVENLABS_API_KEY: ${{ secrets.BAKED_ELEVENLABS_API_KEY }}
           # Optional ad-hoc codesigning. If you set these repo secrets, the
           # produced .dmg / .app is signed and judges skip the Gatekeeper
           # right-click → Open dance. Without them the build still succeeds

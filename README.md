@@ -22,14 +22,11 @@ Right-click Atlas.app  →  Open  →  Open
 
 You only need to do this once per machine. Subsequent launches open normally.
 
-### 2. Paste your keys
+### 2. Run it
 
-Open Atlas. The first-run onboarding walks you through picking a voice. Before that flow can talk to Claude, two keys need to land in the app's config:
+That's it — no setup. The judges bundle ships with a working ElevenLabs agent + a rate-limited Cloudflare worker baked in, so the voice loop works on first launch. You'll see the onboarding wizard (pick a voice, read the privacy note) and then the home screen.
 
-1. **Anthropic key** — [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys). Free $5 trial covers all demo turns.
-2. **ElevenLabs key** — [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys). Free tier covers the voice loop.
-
-Open `~/Library/Application Support/com.atlas.desktop/preferences.json` and paste the keys (or use the Settings panel in-app once you've completed onboarding).
+Daily fair-use cap per IP is **200 requests** (~30–60 demo turns depending on whether you're using web search, image generation, or just chat). If you hit it, come back tomorrow or reach out to the hackathon team.
 
 ### 3. Try these voice queries
 

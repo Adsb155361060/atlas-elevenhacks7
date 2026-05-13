@@ -31,7 +31,12 @@ export const EnvSchema = z.object({
   ROUTER_TOOL_MODEL: ModelId.default('claude-sonnet-4-6'),
   ROUTER_TRIAGE_MODEL: ModelId.default('claude-haiku-4-5-20251001'),
   DAILY_ANTHROPIC_BUDGET_USD: z.string().default('20'),
+  RATE_LIMIT_PER_DAY: z.string().default('200'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
+
+  // KV binding for per-IP daily counters. `unknown` because zod can't
+  // describe a Workers KV namespace shape; the consumer casts.
+  ATLAS_RATELIMIT: z.unknown().optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

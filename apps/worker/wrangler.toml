@@ -18,14 +18,18 @@ ROUTER_TOOL_MODEL = "claude-sonnet-4-6"
 ROUTER_TRIAGE_MODEL = "claude-haiku-4-5-20251001"
 DAILY_ANTHROPIC_BUDGET_USD = "20"
 LOG_LEVEL = "info"
+# Per-IP rate-limit for the Path-A judges build. Counts requests against
+# ATLAS_RATELIMIT KV; returns 429 once exceeded.
+RATE_LIMIT_PER_DAY = "200"
 
 # Observability: enable workers analytics + tail logs
 [observability]
 enabled = true
 
-# Routes added at deploy time:
-#   atlas-worker.<your-subdomain>.workers.dev (default)
-#   or a custom route on a Cloudflare-managed domain
+# Per-IP rate limit counters (Path A judges build).
+[[kv_namespaces]]
+binding = "ATLAS_RATELIMIT"
+id = "fadc34344ba84095a75e4fab9a0cc778"
 
 # KV / R2 bindings reserved for later phases (artifact storage, blob cache):
 # [[kv_namespaces]]

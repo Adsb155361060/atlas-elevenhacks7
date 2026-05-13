@@ -3,6 +3,7 @@
 //! `main.rs` is a thin shim; almost everything lives here so we can be
 //! exercised by `cargo test` without spawning a window.
 
+mod bundled;
 mod commands;
 mod hotkey;
 mod mini;
@@ -26,6 +27,14 @@ pub fn run() {
 }
 
 fn run_inner() -> Result<()> {
+    // Path A (judges build): if CI baked any of the four runtime config
+    // values into the binary, copy them into std::env *before* any voice
+    // subsystem reads its env. Idempotent — `.env.local` always wins.
+    bundled::hydrate_env_from_baked();
+    if bundled::baked() {
+        eprintln!("atlas-desktop: running with pre-baked configuration");
+    }
+
     tauri::Builder::default()
         // Logging — stdout + per-user OS log dir
         .plugin(

@@ -5,6 +5,7 @@
 
 import { Hono } from 'hono';
 import { parseEnv, type Env } from './env.js';
+import { rateLimit } from './ratelimit.js';
 import { healthz } from './routes/healthz.js';
 import { chatCompletions } from './routes/chatCompletions.js';
 import { voices } from './routes/voices.js';
@@ -34,6 +35,11 @@ app.use('*', async (c, next) => {
 });
 
 app.route('/healthz', healthz);
+
+// Per-IP daily rate-limit on every /v1/* route. /healthz is exempt so
+// uptime monitors aren't capped. See src/ratelimit.ts.
+app.use('/v1/*', rateLimit);
+
 app.route('/v1/chat/completions', chatCompletions);
 app.route('/v1/voices', voices);
 app.route('/v1/tools', tools);

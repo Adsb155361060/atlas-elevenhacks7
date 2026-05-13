@@ -10,6 +10,7 @@ const ENV: Env = {
   ROUTER_TOOL_MODEL: 'claude-sonnet-4-6',
   ROUTER_TRIAGE_MODEL: 'claude-haiku-4-5-20251001',
   DAILY_ANTHROPIC_BUDGET_USD: '20',
+  RATE_LIMIT_PER_DAY: '200',
   LOG_LEVEL: 'info',
 };
 

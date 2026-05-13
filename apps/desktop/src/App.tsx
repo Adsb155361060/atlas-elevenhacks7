@@ -10,12 +10,19 @@ import { useArtifact } from './state/artifact';
 import { getPrefs } from './ipc/voice-prefs';
 import { subscribeToArtifacts } from './ipc/artifact';
 import { subscribeToCameraCaptures } from './ipc/camera';
+import { subscribeToToolStatus } from './ipc/toolStatus';
+import { useToolStatus } from './state/toolStatus';
+import { useFirstRun } from './state/firstRun';
 import { StatusDot } from './components/StatusDot';
 import { CaptionStrip } from './components/CaptionStrip';
 import { Onboarding } from './components/Onboarding';
 import { Settings } from './components/Settings';
 import { ArtifactSurface } from './components/Artifact';
 import { TimerStack } from './components/TimerStack';
+import { ToolBadge } from './components/ToolBadge';
+import { ErrorToast } from './components/ErrorToast';
+import { IdlePrompts } from './components/IdlePrompts';
+import { FirstRunTutorial } from './components/FirstRunTutorial';
 
 const PROMPT_BY_STATE: Record<AtlasUIState, string> = {
   idle: "Hold Super+Space or say 'Hey Atlas' to begin",
@@ -38,6 +45,20 @@ export function App() {
   const ingestArtifact = useArtifact((s) => s.ingest);
   const clearArtifacts = useArtifact((s) => s.clear);
   const currentArtifact = useArtifact((s) => s.current);
+  const startToolCall = useToolStatus((s) => s.startCall);
+  const endToolCall = useToolStatus((s) => s.endCall);
+  const setFirstRunDismissed = useFirstRun((s) => s.setDismissed);
+
+  // First-run flag — checked against localStorage. Drops the tutorial when
+  // the user has already dismissed it on a previous launch.
+  useEffect(() => {
+    try {
+      const v = window.localStorage.getItem('atlas:first_run_dismissed');
+      setFirstRunDismissed(v === 'true');
+    } catch {
+      setFirstRunDismissed(false);
+    }
+  }, [setFirstRunDismissed]);
 
   // Bootstrap onboarding state from Rust prefs. Runs once on mount.
   useEffect(() => {
@@ -84,6 +105,14 @@ export function App() {
       unlistenCamera = fn;
     });
 
+    let unlistenToolStatus: (() => void) | undefined;
+    subscribeToToolStatus(
+      (call) => startToolCall(call),
+      (result) => endToolCall(result),
+    ).then((fn) => {
+      unlistenToolStatus = fn;
+    });
+
     return () => {
       unlistenState?.();
       unlistenTranscripts?.();
@@ -91,8 +120,9 @@ export function App() {
       unlistenSettingsOpen?.();
       unlistenArtifacts?.();
       unlistenCamera?.();
+      unlistenToolStatus?.();
     };
-  }, [setState, ingestTranscript, clearTranscripts, setView, ingestArtifact, clearArtifacts]);
+  }, [setState, ingestTranscript, clearTranscripts, setView, ingestArtifact, clearArtifacts, startToolCall, endToolCall]);
 
   // Loading: prefs not yet known — render a blank screen for one tick.
   if (onboardingCompleted === null) {
@@ -140,14 +170,19 @@ export function App() {
               Ask me anything.
             </p>
             <p className="mt-3 text-sm text-slate-500">
-              Hold <kbd className="font-mono text-slate-400">⌘&nbsp;+&nbsp;Shift&nbsp;+&nbsp;A</kbd> to talk.
+              Hold <kbd className="font-mono text-slate-400">⌘&nbsp;+&nbsp;Shift&nbsp;+&nbsp;A</kbd> to talk
+              {' '}— or click a prompt below to send one immediately.
             </p>
+            <IdlePrompts />
           </div>
         )}
       </div>
 
       <CaptionStrip />
       <TimerStack />
+      <ToolBadge />
+      <ErrorToast />
+      <FirstRunTutorial />
     </main>
   );
 }

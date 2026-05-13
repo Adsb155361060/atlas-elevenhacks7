@@ -411,6 +411,27 @@ impl<R: Runtime> SessionCallbacks for OrchestratorCallbacks<R> {
 
         let outcome = crate::tools::dispatch(&self.app, tool_name, &params_value);
 
+        // Surface dispatch outcome so the frontend can hide the in-flight
+        // badge and (on error) raise a toast.
+        let result_preview = if outcome.is_error {
+            outcome
+                .result
+                .as_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "tool failed".to_string())
+        } else {
+            String::new()
+        };
+        let _ = self.app.emit(
+            "voice:client_tool_result",
+            serde_json::json!({
+                "tool_name": tool_name,
+                "tool_call_id": tool_call_id,
+                "is_error": outcome.is_error,
+                "error_message": result_preview,
+            }),
+        );
+
         if let Some(voice) = self.app.try_state::<VoiceHandle>() {
             // Encode the result Value as a JSON string for the agent —
             // ElevenLabs Conv-AI expects `result: string`. Pretty-printing it

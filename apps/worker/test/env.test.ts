@@ -8,7 +8,8 @@ describe('parseEnv', () => {
       ALLOWED_AGENT_TOKENS: 'tok1',
     });
     expect(env.WORKER_VERSION).toBe('0.0.0');
-    expect(env.DEFAULT_LLM_MODEL).toBe('gemini-2.5-flash');
+    expect(env.DEFAULT_LLM_MODEL).toBe('gemini-2.5-pro');
+    expect(env.FALLBACK_LLM_MODEL).toBe('gemini-2.5-flash');
     expect(env.ROUTER_TOOL_MODEL).toBe('gemini-2.5-flash');
     expect(env.ROUTER_TRIAGE_MODEL).toBe('gemini-2.5-flash-lite');
     expect(env.LOG_LEVEL).toBe('info');

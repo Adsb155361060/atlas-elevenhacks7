@@ -6,7 +6,8 @@ const ENV: Env = {
   GEMINI_API_KEY: 'g-fake',
   ALLOWED_AGENT_TOKENS: 'tok',
   WORKER_VERSION: '0.0.0',
-  DEFAULT_LLM_MODEL: 'gemini-2.5-flash',
+  DEFAULT_LLM_MODEL: 'gemini-2.5-pro',
+  FALLBACK_LLM_MODEL: 'gemini-2.5-flash',
   ROUTER_TOOL_MODEL: 'gemini-2.5-flash',
   ROUTER_TRIAGE_MODEL: 'gemini-2.5-flash-lite',
   DEFAULT_ANTHROPIC_MODEL: 'claude-opus-4-7',
@@ -24,11 +25,11 @@ describe('resolveGeminiModel', () => {
   it('maps legacy Anthropic hints to Gemini tiers', () => {
     expect(resolveGeminiModel('claude-haiku-4-5', ENV)).toBe('gemini-2.5-flash-lite');
     expect(resolveGeminiModel('claude-sonnet-4-6', ENV)).toBe('gemini-2.5-flash');
-    expect(resolveGeminiModel('claude-opus-4-7', ENV)).toBe('gemini-2.5-flash');
+    expect(resolveGeminiModel('claude-opus-4-7', ENV)).toBe('gemini-2.5-pro');
   });
 
   it('falls back to default for unknown labels', () => {
-    expect(resolveGeminiModel('gpt-4o', ENV)).toBe('gemini-2.5-flash');
-    expect(resolveGeminiModel('', ENV)).toBe('gemini-2.5-flash');
+    expect(resolveGeminiModel('gpt-4o', ENV)).toBe('gemini-2.5-pro');
+    expect(resolveGeminiModel('', ENV)).toBe('gemini-2.5-pro');
   });
 });

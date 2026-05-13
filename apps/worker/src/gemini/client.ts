@@ -30,6 +30,14 @@ export interface GeminiStreamChunk {
   };
 }
 
+/**
+ * Open a streaming generation against the configured primary model. On a
+ * "capacity-class" failure (429 rate-limited, 5xx upstream, 404 model not
+ * found / unavailable) and when `FALLBACK_LLM_MODEL` is non-empty + different
+ * from the primary, retry against the fallback once. All other failures
+ * (4xx auth, malformed request, network errors) propagate immediately so we
+ * don't mask real bugs.
+ */
 export async function openGeminiStream(
   env: Env,
   model: string,
@@ -40,8 +48,31 @@ export async function openGeminiStream(
     throw new Error('GEMINI_API_KEY missing on worker — set via `wrangler secret put`');
   }
 
-  const url = `${BASE}/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+  try {
+    return await callGemini(apiKey, model, body);
+  } catch (err) {
+    const fallback = env.FALLBACK_LLM_MODEL?.trim();
+    if (
+      fallback &&
+      fallback !== model &&
+      err instanceof GeminiUpstreamError &&
+      err.isCapacityClass()
+    ) {
+      console.warn(
+        `gemini ${model} failed (${err.status}); falling back to ${fallback}`,
+      );
+      return await callGemini(apiKey, fallback, body);
+    }
+    throw err;
+  }
+}
 
+async function callGemini(
+  apiKey: string,
+  model: string,
+  body: GeminiRequestBody,
+): Promise<AsyncGenerator<GeminiStreamChunk, void, void>> {
+  const url = `${BASE}/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
   const resp = await fetch(url, {
     method: 'POST',
     headers: {
@@ -53,10 +84,35 @@ export async function openGeminiStream(
 
   if (!resp.ok || !resp.body) {
     const errText = await resp.text().catch(() => '');
-    throw new Error(`Gemini ${resp.status} ${resp.statusText}: ${errText.slice(0, 500)}`);
+    throw new GeminiUpstreamError(
+      resp.status,
+      `Gemini ${resp.status} ${resp.statusText}: ${errText.slice(0, 500)}`,
+    );
   }
 
   return iterateSse(resp.body);
+}
+
+export class GeminiUpstreamError extends Error {
+  public readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'GeminiUpstreamError';
+    this.status = status;
+  }
+  /**
+   * Classes of failures that warrant a fallback retry rather than surfacing
+   * the error. 503 (overloaded), 429 (rate-limited), 5xx in general, and 404
+   * (model not found / not yet rolled out to the project) are all transient
+   * or model-specific.
+   */
+  isCapacityClass(): boolean {
+    return (
+      this.status === 404 ||
+      this.status === 429 ||
+      (this.status >= 500 && this.status < 600)
+    );
+  }
 }
 
 /**
@@ -73,15 +129,18 @@ async function* iterateSse(
   const decoder = new TextDecoder('utf-8');
   let buffer = '';
 
+  // Gemini 2.5 Pro emits CRLF (`\r\n`) line endings; Flash emits LF (`\n`).
+  // Normalise both before searching so the event splitter works either way.
+  const normalize = (s: string): string => s.replace(/\r\n/g, '\n');
+
   try {
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      buffer += normalize(decoder.decode(value, { stream: true }));
 
-      // SSE events are separated by a blank line (\n\n). Anything before the
-      // last `\n\n` is a complete event we can process; the tail (possibly a
-      // partial event) stays in `buffer` for the next read.
+      // Events are separated by `\n\n`. Anything before the last separator is
+      // a complete event; the tail (possibly partial) stays in the buffer.
       let cut: number;
       while ((cut = buffer.indexOf('\n\n')) >= 0) {
         const eventText = buffer.slice(0, cut);
@@ -90,7 +149,6 @@ async function* iterateSse(
         if (parsed) yield parsed;
       }
     }
-    // Flush any trailing partial event.
     if (buffer.trim().length > 0) {
       const parsed = parseSseEvent(buffer);
       if (parsed) yield parsed;

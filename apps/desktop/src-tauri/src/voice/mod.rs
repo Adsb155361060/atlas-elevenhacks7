@@ -75,9 +75,7 @@ fn log_audio_device_snapshot() {
 
     match host.input_devices() {
         Ok(devs) => {
-            let names: Vec<String> = devs
-                .filter_map(|d| d.name().ok())
-                .collect();
+            let names: Vec<String> = devs.filter_map(|d| d.name().ok()).collect();
             if names.is_empty() {
                 log::warn!(
                     "voice/audio: cpal sees ZERO input devices. On Windows, open Settings → Privacy & security → Microphone and turn on 'Let desktop apps access your microphone', then relaunch Atlas."

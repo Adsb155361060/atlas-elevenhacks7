@@ -1,8 +1,201 @@
 {
-  "$schema": "../contracts/schema/tool-bundle.schema.json",
-  "version": "v1",
-  "description": "Tools exposed to the Conversational Agent. Empty in Phase 0.B; tools land in Phase 1. Regenerated from packages/contracts/src/tools/ via `pnpm gen:tools` once the contracts package is fleshed out.",
-  "client_tools": [],
-  "server_tools": [],
-  "mcp_tools": []
+  "$generated_by": "packages/contracts/scripts/gen.ts",
+  "$do_not_edit": "Edit packages/contracts/src/tools/index.ts and rerun pnpm gen.",
+  "$version": "v1",
+  "count": 7,
+  "tools": [
+    {
+      "name": "web_search",
+      "description": "Search the live web for current information. Use whenever the user asks about news, events, prices, scores, weather, or anything time-sensitive — your training cutoff is months behind. Don't use it for general knowledge the user could just chat about.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "The search query as a natural-language phrase."
+          },
+          "count": {
+            "type": "integer",
+            "description": "How many results to retrieve (1-10). Default 5.",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 5
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "render_artifact",
+      "description": "Show the user a visual artifact in the Atlas main window (map, chart, list, image, code, markdown, table, search_results, tutorial). Use it alongside your spoken reply — the screen carries detail your voice shouldn't. Don't read the artifact aloud, just acknowledge what's appearing.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "Artifact kind. The frontend has a renderer per type.",
+            "enum": [
+              "map",
+              "chart",
+              "code",
+              "markdown",
+              "image",
+              "table",
+              "search_results",
+              "tutorial"
+            ]
+          },
+          "data": {
+            "type": "object",
+            "description": "Type-specific payload. The renderer decides the shape.",
+            "properties": {},
+            "additionalProperties": true
+          },
+          "narration": {
+            "type": "string",
+            "description": "Optional one-sentence label of what's appearing — falls back to the renderer's default if omitted."
+          }
+        },
+        "required": [
+          "type",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "launch_app",
+      "description": "Open a desktop application by its display name. Fuzzy-matches against installed apps. If the app is already running, focus it instead of launching a second instance.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "App name as the user would say it (e.g., \"chrome\", \"obsidian\", \"terminal\")."
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "music_control",
+      "description": "Control music playback. Use 'play' with a query to start something specific via Spotify (if connected). Use 'play'/'pause'/'next'/'previous'/'volume' without a query for local MPRIS players.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "play",
+              "pause",
+              "next",
+              "previous",
+              "volume"
+            ]
+          },
+          "query": {
+            "type": "string",
+            "description": "Track/artist/playlist text — required only when action=\"play\" and the user named something."
+          },
+          "value": {
+            "type": "number",
+            "description": "Volume target 0-100 — only when action=\"volume\".",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "open_path",
+      "description": "Open a file or folder with the system default app (xdg-open on Linux, `open` on macOS, `start` on Windows). Use for 'open my downloads folder', 'open the latest report', etc.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Absolute path or \"~/…\"-style home-relative path."
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "find_files",
+      "description": "Search for files by name within an allowed scope (home/downloads/documents). Filename-only for V1; content search lands in Phase 7.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Filename pattern (substring match, case-insensitive)."
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "home",
+              "downloads",
+              "documents"
+            ],
+            "default": "home"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50,
+            "default": 10
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "system_action",
+      "description": "Adjust system settings (volume/brightness/DND/sleep). Use when the user asks 'turn it down', 'mute', 'do not disturb', 'lock the screen'. Always speak a one-sentence confirmation aloud BEFORE calling dnd_on or display_sleep — they're sticky.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "volume_up",
+              "volume_down",
+              "mute",
+              "brightness_up",
+              "brightness_down",
+              "dnd_on",
+              "dnd_off",
+              "display_sleep"
+            ]
+          },
+          "value": {
+            "type": "number",
+            "description": "Step size 0-100, optional. Defaults: volume ±5, brightness ±5.",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ]
 }

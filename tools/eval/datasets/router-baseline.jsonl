@@ -1,0 +1,31 @@
+// Phase 1.0 router-baseline.
+//
+// Validates that Claude picks the right tool family for an utterance. Each
+// row is JSON. Comments / blank lines are skipped by the runner.
+// Required keys: input, expected_tool (use null for "no tool").
+// Optional: label, expected_args_match (deep subset), expected_text_pattern (regex).
+//
+// Two passes through the harness:
+//   1) Now (Phase 1.0) — checks routing only; no tool actually executes.
+//      Expected pass rate: 18/20 per the dev plan §5 exit gate.
+//   2) After Phase 1.6 — same dataset; tools execute end-to-end.
+{"label": "web_search-weather", "input": "what's the weather in Bengaluru tomorrow", "expected_tool": "web_search", "expected_args_match": {"query": "weather"}}
+{"label": "web_search-news", "input": "who won the F1 race this weekend", "expected_tool": "web_search", "expected_args_match": {"query": "F1"}}
+{"label": "web_search-fact", "input": "what is the population of Lagos", "expected_tool": "web_search", "expected_args_match": {"query": "Lagos"}}
+{"label": "launch_app-chrome", "input": "open chrome", "expected_tool": "launch_app", "expected_args_match": {"name": "chrome"}}
+{"label": "launch_app-obsidian", "input": "launch obsidian", "expected_tool": "launch_app", "expected_args_match": {"name": "obsidian"}}
+{"label": "launch_app-terminal", "input": "open the terminal please", "expected_tool": "launch_app", "expected_args_match": {"name": "terminal"}}
+{"label": "music-play-genre", "input": "play some lo-fi", "expected_tool": "music_control", "expected_args_match": {"action": "play", "query": "lo-fi"}}
+{"label": "music-pause", "input": "pause", "expected_tool": "music_control", "expected_args_match": {"action": "pause"}}
+{"label": "music-next", "input": "next track", "expected_tool": "music_control", "expected_args_match": {"action": "next"}}
+{"label": "music-play-song", "input": "play Wonderwall", "expected_tool": "music_control", "expected_args_match": {"action": "play", "query": "Wonderwall"}}
+{"label": "open_path-downloads", "input": "open my downloads folder", "expected_tool": "open_path", "expected_args_match": {"path": "Downloads"}}
+{"label": "find_files-name", "input": "find files named jarvis", "expected_tool": "find_files", "expected_args_match": {"query": "jarvis"}}
+{"label": "system-volume-down", "input": "turn it down", "expected_tool": "system_action", "expected_args_match": {"action": "volume_down"}}
+{"label": "system-mute", "input": "mute the audio", "expected_tool": "system_action", "expected_args_match": {"action": "mute"}}
+{"label": "system-dnd", "input": "do not disturb for an hour", "expected_tool": "system_action", "expected_args_match": {"action": "dnd_on"}}
+{"label": "general-knowledge", "input": "what is the capital of France", "expected_tool": null, "expected_text_pattern": "paris"}
+{"label": "general-arithmetic", "input": "what is twenty-seven times four", "expected_tool": null, "expected_text_pattern": "108|one hundred eight"}
+{"label": "general-greeting", "input": "hi there how's your day", "expected_tool": null}
+{"label": "general-meta", "input": "what can you help me with", "expected_tool": null}
+{"label": "general-creative", "input": "tell me a one-line haiku about rain", "expected_tool": null}

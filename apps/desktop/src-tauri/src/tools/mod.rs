@@ -13,6 +13,7 @@
 //! `music_control`, `open_path`, `find_files`, `system_action`.
 
 mod launch_app;
+mod music_control;
 mod render_artifact;
 
 use serde::{Deserialize, Serialize};
@@ -48,6 +49,7 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, name: &str, parameters: &Value) 
     match name {
         "render_artifact" => render_artifact::execute(app, parameters),
         "launch_app" => launch_app::execute(app, parameters),
+        "music_control" => music_control::execute(app, parameters),
         other => ToolResult::err(format!(
             "tool '{other}' is not implemented on the desktop client (Phase 1.x)"
         )),

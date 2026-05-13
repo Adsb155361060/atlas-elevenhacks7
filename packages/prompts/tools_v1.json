@@ -91,6 +91,7 @@
         "properties": {
           "action": {
             "type": "string",
+            "description": "Playback verb. 'play' resumes (or starts a search if a query is given); 'volume' takes a 0-100 value.",
             "enum": [
               "play",
               "pause",
@@ -145,6 +146,7 @@
           },
           "scope": {
             "type": "string",
+            "description": "Allowed search root. Defaults to home.",
             "enum": [
               "home",
               "downloads",
@@ -154,6 +156,7 @@
           },
           "limit": {
             "type": "integer",
+            "description": "Max results to return (1-50). Default 10.",
             "minimum": 1,
             "maximum": 50,
             "default": 10
@@ -173,6 +176,7 @@
         "properties": {
           "action": {
             "type": "string",
+            "description": "Which system control to adjust. dnd_on and display_sleep are sticky — confirm aloud first.",
             "enum": [
               "volume_up",
               "volume_down",

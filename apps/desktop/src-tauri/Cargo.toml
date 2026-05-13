@@ -45,6 +45,11 @@ bytes = "1"
 # Tools — Phase 1
 fuzzy-matcher = "0.3"
 
+# Linux-only: MPRIS for media-player control (Phase 1.3).
+# Needs libdbus-1-dev on the system (already a Tauri prereq).
+[target.'cfg(target_os = "linux")'.dependencies]
+mpris = "2"
+
 [features]
 custom-protocol = ["tauri/custom-protocol"]
 

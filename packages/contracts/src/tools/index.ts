@@ -186,6 +186,8 @@ const MUSIC_CONTROL: ToolSpec = {
     properties: {
       action: {
         type: 'string',
+        description:
+          "Playback verb. 'play' resumes (or starts a search if a query is given); 'volume' takes a 0-100 value.",
         enum: ['play', 'pause', 'next', 'previous', 'volume'],
       },
       query: {
@@ -246,10 +248,11 @@ const FIND_FILES: ToolSpec = {
       query: { type: 'string', description: 'Filename pattern (substring match, case-insensitive).' },
       scope: {
         type: 'string',
+        description: 'Allowed search root. Defaults to home.',
         enum: ['home', 'downloads', 'documents'],
         default: 'home',
       },
-      limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+      limit: { type: 'integer', description: 'Max results to return (1-50). Default 10.', minimum: 1, maximum: 50, default: 10 },
     },
     required: ['query'],
     additionalProperties: false,
@@ -275,6 +278,8 @@ const SYSTEM_ACTION: ToolSpec = {
     properties: {
       action: {
         type: 'string',
+        description:
+          "Which system control to adjust. dnd_on and display_sleep are sticky — confirm aloud first.",
         enum: [
           'volume_up',
           'volume_down',

@@ -4,13 +4,41 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Atlas brand placeholder palette — refined when public name + brand land
-        atlas: {
-          listening: '#10b981',
-          thinking: '#f59e0b',
-          speaking: '#a855f7',
-          idle: '#475569',
+        // Brass-and-Ink palette (mirrors the CSS variables in styles.css).
+        // Tailwind utilities can reach these as `bg-ink`, `text-brass`, etc.
+        ink: {
+          DEFAULT: '#14110e',
+          2: '#1a1612',
+          3: '#221c17',
         },
+        cream: {
+          DEFAULT: '#f4efe6',
+          dim: '#c8c0b2',
+          mute: '#8a8377',
+          faint: '#4a453e',
+        },
+        brass: {
+          DEFAULT: '#c9a04f',
+          deep: '#8b6b2a',
+          glow: '#e8c77a',
+        },
+        sage: {
+          DEFAULT: '#8fae9f',
+          deep: '#5c7a6b',
+        },
+        signal: { red: '#b85841' },
+        // Legacy keys still referenced in older components; resolved to the
+        // brass-and-ink equivalents while we migrate.
+        atlas: {
+          listening: '#8fae9f',
+          thinking: '#c9a04f',
+          speaking: '#e8c77a',
+          idle: '#4a453e',
+        },
+      },
+      fontFamily: {
+        serif: ['Fraunces', 'Iowan Old Style', 'Georgia', 'ui-serif', 'serif'],
+        mono: ['IBM Plex Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'monospace'],
       },
       keyframes: {
         'fade-in': {

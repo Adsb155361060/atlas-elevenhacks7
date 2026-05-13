@@ -1,36 +1,56 @@
-import { useEffect } from 'react';
+/**
+ * Atlas — main app shell. Brass-and-ink cockpit layout.
+ *
+ * Layers (back to front):
+ *   1. cockpit-stage (ink background + film grain)
+ *   2. HUD (coordinate grid + 4 telemetry corners)
+ *   3. OrbStage (centered or pinned upper-left when an artifact is active)
+ *   4. ContentPane (right side when artifact active)
+ *   5. CaptionRail (bottom-left)
+ *   6. Floating overlays (TimerStack, ToolBadge, ErrorToast, FirstRunTutorial)
+ *
+ * Onboarding + Settings keep their own backgrounds for now — they don't
+ * render the cockpit, so reskinning them happens in a follow-up commit.
+ */
+
+import { useEffect, useState } from 'react';
 import { listen } from '@tauri-apps/api/event';
-import { useAtlasState, type AtlasUIState } from './state/store';
+import { invoke } from '@tauri-apps/api/core';
+import { useAtlasState } from './state/store';
 import { getState, subscribeToState } from './ipc/state';
 import { subscribeToTranscripts } from './ipc/transcripts';
 import { useTranscripts } from './state/transcripts';
 import { useOnboarding } from './state/onboarding';
 import { useView } from './state/view';
 import { useArtifact } from './state/artifact';
+import { useFirstRun } from './state/firstRun';
+import { useToolStatus } from './state/toolStatus';
+import { useAudioLevel } from './state/audio';
+import { toCockpitState, type CockpitState } from './state/cockpit';
 import { getPrefs } from './ipc/voice-prefs';
 import { subscribeToArtifacts } from './ipc/artifact';
 import { subscribeToCameraCaptures } from './ipc/camera';
 import { subscribeToToolStatus } from './ipc/toolStatus';
-import { useToolStatus } from './state/toolStatus';
-import { useFirstRun } from './state/firstRun';
-import { StatusDot } from './components/StatusDot';
-import { CaptionStrip } from './components/CaptionStrip';
+import { HUD } from './components/HUD';
+import { OrbStage } from './components/OrbStage';
+import { CaptionRail } from './components/CaptionRail';
 import { Onboarding } from './components/Onboarding';
 import { Settings } from './components/Settings';
 import { ArtifactSurface } from './components/Artifact';
 import { TimerStack } from './components/TimerStack';
 import { ToolBadge } from './components/ToolBadge';
 import { ErrorToast } from './components/ErrorToast';
-import { IdlePrompts } from './components/IdlePrompts';
 import { FirstRunTutorial } from './components/FirstRunTutorial';
 
-const PROMPT_BY_STATE: Record<AtlasUIState, string> = {
-  idle: "Hold Super+Space or say 'Hey Atlas' to begin",
-  armed: 'Connecting…',
-  listening: 'Listening…',
-  thinking: 'Thinking…',
-  speaking: 'Speaking…',
-  paused: 'Paused — click the tray to resume',
+// Coordinate-grid opacity per cockpit state — denser mid-conversation,
+// quieter at rest. Mirrors the reference design's GRID_OPACITY.
+const GRID_OPACITY: Record<CockpitState, number> = {
+  idle: 0.06,
+  wake: 0.1,
+  listening: 0.1,
+  thinking: 0.08,
+  speaking: 0.08,
+  content: 0.14,
 };
 
 export function App() {
@@ -49,8 +69,21 @@ export function App() {
   const endToolCall = useToolStatus((s) => s.endCall);
   const setFirstRunDismissed = useFirstRun((s) => s.setDismissed);
 
-  // First-run flag — checked against localStorage. Drops the tutorial when
-  // the user has already dismissed it on a previous launch.
+  // The Rust agent emits voice:session_started with the ElevenLabs
+  // conversation_id; we display its first 8 chars in the TLCorner so the
+  // hex feels real mid-call, not a per-window random number.
+  const [conversationId, setConversationId] = useState<string | null>(null);
+
+  // Cockpit state = AtlasUIState mapped to the design's 6-state machine.
+  // 'content' fires when an artifact is rendered alongside speaking/idle.
+  const cockpit = toCockpitState(state, currentArtifact !== null);
+
+  // Audio source: real VAD when a session is live; simulated otherwise so
+  // the orb never feels frozen.
+  const audioSource = state === 'idle' || state === 'paused' ? 'simulated' : 'session';
+  const audio = useAudioLevel(audioSource, cockpit);
+
+  // First-run flag — read from localStorage.
   useEffect(() => {
     try {
       const v = window.localStorage.getItem('atlas:first_run_dismissed');
@@ -60,125 +93,170 @@ export function App() {
     }
   }, [setFirstRunDismissed]);
 
-  // Bootstrap onboarding state from Rust prefs. Runs once on mount.
+  // Onboarding flag — read from Rust preferences.
   useEffect(() => {
     getPrefs()
       .then((p) => setOnboardingCompleted(p.onboarding_completed))
       .catch(() => setOnboardingCompleted(false));
   }, [setOnboardingCompleted]);
 
-  // Bootstrap from current backend state, then subscribe to changes.
+  // Bootstrap + subscribe to all events.
   useEffect(() => {
     let unlistenState: (() => void) | undefined;
     let unlistenTranscripts: (() => void) | undefined;
     let unlistenSessionEnd: (() => void) | undefined;
+    let unlistenSessionStart: (() => void) | undefined;
     let unlistenSettingsOpen: (() => void) | undefined;
     let unlistenArtifacts: (() => void) | undefined;
+    let unlistenCamera: (() => void) | undefined;
+    let unlistenToolStatus: (() => void) | undefined;
 
     void getState().then(setState).catch(() => undefined);
-
     subscribeToState(setState).then((fn) => {
       unlistenState = fn;
     });
-
     subscribeToTranscripts(ingestTranscript).then((fn) => {
       unlistenTranscripts = fn;
     });
-
+    listen<string>('voice:session_started', (e) => setConversationId(e.payload)).then((fn) => {
+      unlistenSessionStart = fn;
+    });
     listen('voice:session_ended', () => {
       clearTranscripts();
       clearArtifacts();
+      setConversationId(null);
     }).then((fn) => {
       unlistenSessionEnd = fn;
     });
-
     listen('settings:open', () => setView('settings')).then((fn) => {
       unlistenSettingsOpen = fn;
     });
-
     subscribeToArtifacts(ingestArtifact).then((fn) => {
       unlistenArtifacts = fn;
     });
-
-    let unlistenCamera: (() => void) | undefined;
     subscribeToCameraCaptures().then((fn) => {
       unlistenCamera = fn;
     });
-
-    let unlistenToolStatus: (() => void) | undefined;
-    subscribeToToolStatus(
-      (call) => startToolCall(call),
-      (result) => endToolCall(result),
-    ).then((fn) => {
+    subscribeToToolStatus(startToolCall, endToolCall).then((fn) => {
       unlistenToolStatus = fn;
     });
 
     return () => {
       unlistenState?.();
       unlistenTranscripts?.();
+      unlistenSessionStart?.();
       unlistenSessionEnd?.();
       unlistenSettingsOpen?.();
       unlistenArtifacts?.();
       unlistenCamera?.();
       unlistenToolStatus?.();
     };
-  }, [setState, ingestTranscript, clearTranscripts, setView, ingestArtifact, clearArtifacts, startToolCall, endToolCall]);
+  }, [
+    setState,
+    ingestTranscript,
+    clearTranscripts,
+    setView,
+    ingestArtifact,
+    clearArtifacts,
+    startToolCall,
+    endToolCall,
+  ]);
 
-  // Loading: prefs not yet known — render a blank screen for one tick.
+  // Click-to-wake — anywhere on the cockpit (except buttons / data-no-wake
+  // surfaces) fires a push-to-talk turn. Keeps the design's "tap anywhere"
+  // affordance while leaving the settings gear and content pane interactive.
+  useEffect(() => {
+    if (!onboardingCompleted) return undefined;
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('button')) return;
+      if (target.closest('a')) return;
+      if (target.closest('input,textarea,select')) return;
+      if (target.closest('[data-no-wake]')) return;
+      if (state === 'idle' || state === 'paused') {
+        invoke<void>('fire_wake_test').catch(() => undefined);
+      }
+    };
+    window.addEventListener('click', onClick);
+    return () => window.removeEventListener('click', onClick);
+  }, [state, onboardingCompleted]);
+
+  // Pre-onboarding / settings: defer to their own shells (not the cockpit).
   if (onboardingCompleted === null) {
-    return <div className="min-h-screen bg-slate-950" />;
+    return <div className="min-h-screen" style={{ background: 'var(--ink)' }} />;
   }
-
   if (!onboardingCompleted) {
     return <Onboarding />;
   }
-
   if (view === 'settings') {
     return <Settings />;
   }
 
   return (
-    <main className="relative min-h-screen flex flex-col bg-slate-950 text-slate-100">
-      {/* Header — status dot moves up here once an artifact is active so the artifact gets the central spotlight. */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-slate-900">
-        <div className="flex items-center gap-3">
-          <div className="scale-75 origin-left">
-            <StatusDot state={state} />
-          </div>
-          <p className="text-sm text-slate-400" aria-live="polite">
-            {PROMPT_BY_STATE[state]}
-          </p>
-        </div>
-        <button
-          type="button"
-          aria-label="Open settings"
-          title="Settings"
-          onClick={() => setView('settings')}
-          className="w-8 h-8 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-200 hover:bg-slate-900 transition-colors"
+    <main
+      className="cockpit-stage"
+      style={{ width: '100vw', height: '100vh' }}
+      aria-label="Atlas cockpit"
+    >
+      <HUD
+        state={cockpit}
+        audio={audio}
+        source={audioSource}
+        gridOpacity={GRID_OPACITY[cockpit]}
+        conversationId={conversationId}
+      />
+
+      <OrbStage state={cockpit} audio={audio} />
+
+      {cockpit === 'content' && currentArtifact ? (
+        <div
+          className="content-pane"
+          data-no-wake
+          style={{
+            position: 'absolute',
+            right: 0,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 'calc(55% - 96px)',
+            maxWidth: 1020,
+            paddingRight: 96,
+            pointerEvents: 'auto',
+            zIndex: 5,
+          }}
         >
-          <SettingsGearIcon />
-        </button>
-      </header>
-
-      {/* Body — artifact takes the centre when one exists; idle copy otherwise. */}
-      <div className="flex-1 overflow-y-auto px-6 py-8 pb-32">
-        {currentArtifact ? (
           <ArtifactSurface />
-        ) : (
-          <div className="flex flex-col items-center justify-center min-h-[60vh]">
-            <p className="text-2xl font-light text-slate-300 text-center max-w-md">
-              Ask me anything.
-            </p>
-            <p className="mt-3 text-sm text-slate-500">
-              Hold <kbd className="font-mono text-slate-400">⌘&nbsp;+&nbsp;Shift&nbsp;+&nbsp;A</kbd> to talk
-              {' '}— or click a prompt below to send one immediately.
-            </p>
-            <IdlePrompts />
-          </div>
-        )}
-      </div>
+        </div>
+      ) : null}
 
-      <CaptionStrip />
+      <CaptionRail state={cockpit} wakeWord="Hey Atlas" artifact={currentArtifact} />
+
+      <button
+        type="button"
+        aria-label="Open settings"
+        title="Settings"
+        onClick={() => setView('settings')}
+        data-no-wake
+        style={{
+          position: 'absolute',
+          top: 36,
+          right: 240,
+          width: 28,
+          height: 28,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'transparent',
+          border: '1px solid var(--hair-strong)',
+          borderRadius: 2,
+          color: 'var(--cream-mute)',
+          cursor: 'pointer',
+          zIndex: 20,
+        }}
+      >
+        <SettingsGearIcon />
+      </button>
+
       <TimerStack />
       <ToolBadge />
       <ErrorToast />
@@ -191,11 +269,11 @@ function SettingsGearIcon() {
   return (
     <svg
       viewBox="0 0 24 24"
-      width="18"
-      height="18"
+      width="14"
+      height="14"
       fill="none"
       stroke="currentColor"
-      strokeWidth="1.5"
+      strokeWidth="1.4"
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"

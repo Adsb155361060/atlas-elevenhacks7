@@ -153,3 +153,83 @@ jobs:
           releaseDraft: false
           prerelease: true
           args: --target x86_64-pc-windows-msvc
+
+  build-linux:
+    name: Linux x64 (.deb + .AppImage)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: System dependencies for Tauri + cpal
+        # Tauri's Linux bundle requires webkit2gtk; cpal needs ALSA headers.
+        # `libayatana-appindicator3-dev` is what the tray plugin uses on
+        # modern Ubuntu (libappindicator3-dev was retired in 22.04+).
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libasound2-dev \
+            patchelf \
+            file
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend typecheck
+        run: pnpm --filter @atlas/desktop typecheck
+
+      - name: Build Tauri (x86_64-unknown-linux-gnu)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Same Path A baked-config story as the macOS + Windows jobs.
+          ATLAS_BAKED_WORKER_URL: ${{ secrets.BAKED_WORKER_URL }}
+          ATLAS_BAKED_AGENT_TOKEN: ${{ secrets.BAKED_AGENT_TOKEN }}
+          ATLAS_BAKED_AGENT_ID: ${{ secrets.BAKED_AGENT_ID }}
+          ATLAS_BAKED_ELEVENLABS_API_KEY: ${{ secrets.BAKED_ELEVENLABS_API_KEY }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Atlas ${{ github.ref_name }}'
+          releaseBody: |
+            macOS / Windows / Linux bundles for Atlas.
+            See `README.md` → **Quick start** section.
+
+            **macOS first launch:** right-click the .app → Open → "Open"
+            again at the Gatekeeper prompt.
+
+            **Windows first launch:** the SmartScreen prompt appears →
+            click "More info" → "Run anyway".
+
+            **Linux:** install the .deb with `sudo dpkg -i Atlas_*.deb` or
+            mark the .AppImage executable and run it. Requires
+            `libwebkit2gtk-4.1-0` and `libayatana-appindicator3-1`
+            on the target machine (preinstalled on most modern desktops).
+          releaseDraft: false
+          prerelease: true
+          args: --target x86_64-unknown-linux-gnu --bundles deb,appimage

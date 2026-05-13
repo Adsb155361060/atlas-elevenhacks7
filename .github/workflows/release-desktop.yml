@@ -66,16 +66,11 @@ jobs:
           ATLAS_BAKED_AGENT_TOKEN: ${{ secrets.BAKED_AGENT_TOKEN }}
           ATLAS_BAKED_AGENT_ID: ${{ secrets.BAKED_AGENT_ID }}
           ATLAS_BAKED_ELEVENLABS_API_KEY: ${{ secrets.BAKED_ELEVENLABS_API_KEY }}
-          # Optional ad-hoc codesigning. If you set these repo secrets, the
-          # produced .dmg / .app is signed and judges skip the Gatekeeper
-          # right-click → Open dance. Without them the build still succeeds
-          # — unsigned bundle, documented workaround in the README.
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          # Intentionally unsigned. Adding the APPLE_* secrets here makes
+          # tauri-action try to import a keychain certificate; with stale
+          # / partial secrets that fails and breaks the whole build.
+          # Judges open the .app via right-click → Open (one-time
+          # Gatekeeper prompt). Documented in README + release body.
         with:
           projectPath: apps/desktop
           tagName: ${{ github.ref_name }}

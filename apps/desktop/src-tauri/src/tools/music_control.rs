@@ -43,9 +43,7 @@ enum Action {
 pub fn execute<R: Runtime>(_app: &AppHandle<R>, parameters: &Value) -> ToolResult {
     let input: MusicInput = match serde_json::from_value(parameters.clone()) {
         Ok(v) => v,
-        Err(err) => {
-            return ToolResult::err(format!("music_control: invalid parameters: {err}"))
-        }
+        Err(err) => return ToolResult::err(format!("music_control: invalid parameters: {err}")),
     };
 
     // A query implies "play something specific" — needs a search engine
@@ -112,9 +110,7 @@ fn dispatch(input: &MusicInput) -> Result<String> {
                 .value
                 .ok_or_else(|| anyhow!("volume action needs a `value` (0-100)"))?;
             let normalized = (target / 100.0).clamp(0.0, 1.0);
-            player
-                .set_volume(normalized)
-                .context("set_volume")?;
+            player.set_volume(normalized).context("set_volume")?;
             Ok(format!("volume {target}% on {identity}"))
         }
     }
@@ -175,7 +171,11 @@ fn dispatch(input: &MusicInput) -> Result<String> {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
         return Err(anyhow!(
             "osascript failed: {}",
-            if stderr.is_empty() { "(no stderr)".into() } else { stderr }
+            if stderr.is_empty() {
+                "(no stderr)".into()
+            } else {
+                stderr
+            }
         ));
     }
     let identity = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -235,7 +235,9 @@ mod tests {
     fn execute_synthetic(params: Value) -> ToolResult {
         let input: MusicInput = match serde_json::from_value(params) {
             Ok(v) => v,
-            Err(err) => return ToolResult::err(format!("music_control: invalid parameters: {err}")),
+            Err(err) => {
+                return ToolResult::err(format!("music_control: invalid parameters: {err}"))
+            }
         };
         if input.query.is_some() && input.action == Action::Play {
             return ToolResult::err(

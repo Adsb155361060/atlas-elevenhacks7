@@ -140,11 +140,7 @@ impl AgentCapture {
 /// and push a `ClientCommand::SendUserAudio` to the WebSocket task. Locks are
 /// held only for the time it takes to copy bytes — microseconds; cpal's
 /// callback thread is robust to that.
-fn accumulate(
-    acc: &Arc<Mutex<Vec<i16>>>,
-    chunk: &[i16],
-    tx: &UnboundedSender<ClientCommand>,
-) {
+fn accumulate(acc: &Arc<Mutex<Vec<i16>>>, chunk: &[i16], tx: &UnboundedSender<ClientCommand>) {
     let mut buf = acc.lock();
     buf.extend_from_slice(chunk);
     while buf.len() >= SAMPLES_PER_CHUNK {

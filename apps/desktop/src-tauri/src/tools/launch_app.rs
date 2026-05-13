@@ -53,9 +53,7 @@ pub struct AppEntry {
 pub fn execute<R: Runtime>(_app: &AppHandle<R>, parameters: &Value) -> ToolResult {
     let input: LaunchInput = match serde_json::from_value(parameters.clone()) {
         Ok(v) => v,
-        Err(err) => {
-            return ToolResult::err(format!("launch_app: invalid parameters: {err}"))
-        }
+        Err(err) => return ToolResult::err(format!("launch_app: invalid parameters: {err}")),
     };
     match launch(&input.name) {
         Ok(entry) => ToolResult::ok(json!({
@@ -73,8 +71,12 @@ pub fn launch(query: &str) -> Result<AppEntry> {
         return Err(anyhow!("name is required"));
     }
     let entries = discover_apps();
-    let entry = best_match(query, &entries)
-        .ok_or_else(|| anyhow!("no app matched '{query}' (scanned {} entries)", entries.len()))?;
+    let entry = best_match(query, &entries).ok_or_else(|| {
+        anyhow!(
+            "no app matched '{query}' (scanned {} entries)",
+            entries.len()
+        )
+    })?;
     spawn_detached(&entry)?;
     log::info!("launch_app: launched id={} name={}", entry.id, entry.name);
     Ok(entry)
@@ -171,7 +173,10 @@ pub fn discover_apps() -> Vec<AppEntry> {
             if path.extension().and_then(|e| e.to_str()) != Some("app") {
                 continue;
             }
-            let Some(name) = path.file_stem().and_then(|s| s.to_str()).map(|s| s.to_string())
+            let Some(name) = path
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_string())
             else {
                 continue;
             };
@@ -225,7 +230,12 @@ pub fn parse_desktop_entry(id: &str, contents: &str) -> Option<AppEntry> {
         // .desktop keys can have locale suffixes like Name[en_US]. Drop them
         // — locale negotiation is out of scope for V1.
         let key_raw = &line[..eq];
-        let key = key_raw.split('[').next().unwrap_or(key_raw).trim().to_string();
+        let key = key_raw
+            .split('[')
+            .next()
+            .unwrap_or(key_raw)
+            .trim()
+            .to_string();
         if kv.contains_key(&key) {
             continue;
         }
@@ -325,7 +335,8 @@ fn spawn_detached(entry: &AppEntry) -> Result<()> {
             Ok(())
         });
     }
-    cmd.spawn().with_context(|| format!("spawn {:?}", entry.exec))?;
+    cmd.spawn()
+        .with_context(|| format!("spawn {:?}", entry.exec))?;
     Ok(())
 }
 
@@ -369,7 +380,11 @@ mod tests {
     use super::*;
 
     fn entry(id: &str, name: &str, exec: &str) -> AppEntry {
-        AppEntry { id: id.into(), name: name.into(), exec: exec.into() }
+        AppEntry {
+            id: id.into(),
+            name: name.into(),
+            exec: exec.into(),
+        }
     }
 
     #[test]
@@ -377,7 +392,10 @@ mod tests {
         assert_eq!(strip_exec_placeholders("google-chrome %U"), "google-chrome");
         assert_eq!(strip_exec_placeholders("vlc %F"), "vlc");
         assert_eq!(strip_exec_placeholders("/usr/bin/foo"), "/usr/bin/foo");
-        assert_eq!(strip_exec_placeholders("sh -c 'echo 100%%'"), "sh -c 'echo 100%'");
+        assert_eq!(
+            strip_exec_placeholders("sh -c 'echo 100%%'"),
+            "sh -c 'echo 100%'"
+        );
         assert_eq!(strip_exec_placeholders(""), "");
     }
 

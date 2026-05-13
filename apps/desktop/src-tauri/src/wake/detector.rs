@@ -56,8 +56,6 @@ impl Detector {
         preds
             .into_iter()
             .filter(|(_, score)| *score >= self.threshold)
-            .max_by(|a, b| {
-                a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal)
-            })
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
     }
 }

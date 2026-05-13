@@ -174,10 +174,7 @@ pub async fn upload_clone(
         let body = resp.text().await.unwrap_or_default();
         return Err(anyhow!("voices/clone {status}: {body}"));
     }
-    let parsed: CloneResult = resp
-        .json()
-        .await
-        .context("voices/clone parse response")?;
+    let parsed: CloneResult = resp.json().await.context("voices/clone parse response")?;
     log::info!("ivc/upload: cloned voice_id={}", parsed.voice_id);
     Ok(parsed)
 }
@@ -324,7 +321,10 @@ mod tests {
         assert_eq!(mime_from_filename("SAMPLE.WAV"), "audio/wav");
         assert_eq!(mime_from_filename("song.mp3"), "audio/mpeg");
         assert_eq!(mime_from_filename("clip.m4a"), "audio/mp4");
-        assert_eq!(mime_from_filename("unknown.xyz"), "application/octet-stream");
+        assert_eq!(
+            mime_from_filename("unknown.xyz"),
+            "application/octet-stream"
+        );
     }
 
     #[test]

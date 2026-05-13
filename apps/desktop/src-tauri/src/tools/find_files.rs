@@ -91,9 +91,12 @@ fn find(query: &str, root: &std::path::Path, limit: usize) -> Result<Vec<String>
     let pattern = format!("*{}*", query);
     let output = Command::new("find")
         .arg(root)
-        .arg("-maxdepth").arg("6")
-        .arg("-type").arg("f")
-        .arg("-iname").arg(&pattern)
+        .arg("-maxdepth")
+        .arg("6")
+        .arg("-type")
+        .arg("f")
+        .arg("-iname")
+        .arg(&pattern)
         .output()
         .context("invoke find")?;
     if !output.status.success() {
@@ -126,9 +129,7 @@ fn escape_mdfind(query: &str) -> String {
     // mdfind metadata queries use NSPredicate-style strings. Wrapped in `*…*`
     // for substring + the `c` modifier for case-insensitive. Escape only
     // backslashes and double quotes — the rest is fine.
-    query
-        .replace('\\', "\\\\")
-        .replace('"', "\\\"")
+    query.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
 #[cfg(test)]

@@ -90,12 +90,8 @@ fn run_osa(script: &str) -> Result<String> {
 fn dispatch(action: &str, value: Option<f64>) -> Result<String> {
     let step = value.unwrap_or(5.0).clamp(0.0, 100.0);
     match action {
-        "volume_up" => sh(&format!(
-            "pactl set-sink-volume @DEFAULT_SINK@ +{step}%"
-        )),
-        "volume_down" => sh(&format!(
-            "pactl set-sink-volume @DEFAULT_SINK@ -{step}%"
-        )),
+        "volume_up" => sh(&format!("pactl set-sink-volume @DEFAULT_SINK@ +{step}%")),
+        "volume_down" => sh(&format!("pactl set-sink-volume @DEFAULT_SINK@ -{step}%")),
         "mute" => sh("pactl set-sink-mute @DEFAULT_SINK@ toggle"),
         "brightness_up" => sh(&format!("brightnessctl set +{step}%")),
         "brightness_down" => sh(&format!("brightnessctl set {step}%-")),

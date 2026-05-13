@@ -76,6 +76,8 @@ fn set_if_unset(name: &str, value: &str) {
         // SAFETY: in Tauri's main thread before any other threads spawn —
         // env mutation here is sound. After `hydrate_env_from_baked`
         // returns, all subsequent reads observe the baked value.
-        unsafe { std::env::set_var(name, value); }
+        unsafe {
+            std::env::set_var(name, value);
+        }
     }
 }

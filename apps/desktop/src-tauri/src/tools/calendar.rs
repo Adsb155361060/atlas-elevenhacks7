@@ -8,9 +8,9 @@
 //! Linux/Windows: deferred. macOS has the simplest no-OAuth path and is the
 //! judges' target.
 
-use anyhow::{anyhow, Result};
 #[cfg(target_os = "macos")]
 use anyhow::Context;
+use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 #[cfg(target_os = "macos")]

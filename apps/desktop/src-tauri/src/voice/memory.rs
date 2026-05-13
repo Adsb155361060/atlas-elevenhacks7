@@ -80,7 +80,9 @@ impl LiveSession {
 
 /// Append a completed turn to disk, evicting the oldest if at cap.
 pub fn append_turn<R: Runtime>(app: &AppHandle<R>, turn: Turn) -> Result<()> {
-    let store = app.store(STORE_FILE).map_err(|e| anyhow!("open store: {e}"))?;
+    let store = app
+        .store(STORE_FILE)
+        .map_err(|e| anyhow!("open store: {e}"))?;
     let mut turns = load_turns(&store);
     turns.push(turn);
     while turns.len() > MAX_TURNS {
@@ -119,7 +121,9 @@ pub fn recent_context<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
 
 /// Wipe all stored turns. Called from Settings → Privacy → Reset.
 pub fn clear<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
-    let store = app.store(STORE_FILE).map_err(|e| anyhow!("open store: {e}"))?;
+    let store = app
+        .store(STORE_FILE)
+        .map_err(|e| anyhow!("open store: {e}"))?;
     store.delete(KEY_TURNS);
     store.save().context("store save")?;
     log::info!("memory: cleared all turns");

@@ -278,7 +278,9 @@ fn dispatch_event(
             user_transcription_event: ev,
         } => callbacks.on_user_transcript(ev.user_transcript.trim()),
 
-        ServerEvent::Interruption { interruption_event: ev } => {
+        ServerEvent::Interruption {
+            interruption_event: ev,
+        } => {
             playback.interrupt(ev.event_id);
             callbacks.on_interruption(ev.event_id);
         }
@@ -294,11 +296,15 @@ fn dispatch_event(
             }
         }
 
-        ServerEvent::ClientToolCall { client_tool_call: ev } => {
+        ServerEvent::ClientToolCall {
+            client_tool_call: ev,
+        } => {
             callbacks.on_client_tool_call(&ev.tool_name, &ev.tool_call_id, &ev.parameters);
         }
 
-        ServerEvent::AgentToolResponse { agent_tool_response: ev } => {
+        ServerEvent::AgentToolResponse {
+            agent_tool_response: ev,
+        } => {
             log::debug!(
                 "voice/client: agent_tool_response name={} id={} err={}",
                 ev.tool_name,
@@ -313,7 +319,9 @@ fn dispatch_event(
             log::debug!("voice/client: agent metadata: {:?}", ev.metadata);
         }
 
-        ServerEvent::VadScore { vad_score_event: ev } => {
+        ServerEvent::VadScore {
+            vad_score_event: ev,
+        } => {
             callbacks.on_vad_score(ev.vad_score);
         }
 

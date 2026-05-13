@@ -51,11 +51,7 @@ pub struct ArtifactEvent {
 pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult {
     let parsed: RenderInput = match serde_json::from_value(parameters.clone()) {
         Ok(v) => v,
-        Err(err) => {
-            return ToolResult::err(format!(
-                "render_artifact: invalid parameters: {err}"
-            ))
-        }
+        Err(err) => return ToolResult::err(format!("render_artifact: invalid parameters: {err}")),
     };
 
     if !KNOWN_TYPES.contains(&parsed.kind.as_str()) {
@@ -80,6 +76,10 @@ pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult
         return ToolResult::err(format!("render_artifact: emit failed: {err}"));
     }
 
-    log::info!("render_artifact: kind={} narration={:?}", event.kind, event.narration);
+    log::info!(
+        "render_artifact: kind={} narration={:?}",
+        event.kind,
+        event.narration
+    );
     ToolResult::ok(serde_json::json!({ "rendered": true }))
 }

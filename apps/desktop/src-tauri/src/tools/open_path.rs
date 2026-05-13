@@ -30,10 +30,7 @@ pub fn execute<R: Runtime>(_app: &AppHandle<R>, parameters: &Value) -> ToolResul
     };
     let path = expand_tilde(&input.path);
     if !path.exists() {
-        return ToolResult::err(format!(
-            "open_path: nothing exists at '{}'",
-            path.display()
-        ));
+        return ToolResult::err(format!("open_path: nothing exists at '{}'", path.display()));
     }
     match open(&path) {
         Ok(_) => ToolResult::ok(json!({ "opened": true, "path": path.display().to_string() })),

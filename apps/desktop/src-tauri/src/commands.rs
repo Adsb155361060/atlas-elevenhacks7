@@ -12,8 +12,8 @@ pub fn get_state<R: Runtime>(app: AppHandle<R>) -> String {
 
 #[tauri::command]
 pub fn set_state<R: Runtime>(app: AppHandle<R>, value: String) -> Result<(), String> {
-    let parsed = AtlasState::parse(&value)
-        .ok_or_else(|| format!("unknown atlas state: {value:?}"))?;
+    let parsed =
+        AtlasState::parse(&value).ok_or_else(|| format!("unknown atlas state: {value:?}"))?;
     state::set(&app, parsed).map_err(|e| e.to_string())
 }
 

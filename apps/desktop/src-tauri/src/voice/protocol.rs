@@ -235,7 +235,10 @@ mod tests {
             ServerEvent::ConversationInitiationMetadata {
                 conversation_initiation_metadata_event,
             } => {
-                assert_eq!(conversation_initiation_metadata_event.conversation_id, "conv_abc");
+                assert_eq!(
+                    conversation_initiation_metadata_event.conversation_id,
+                    "conv_abc"
+                );
                 assert_eq!(
                     conversation_initiation_metadata_event.agent_output_audio_format,
                     "pcm_16000"

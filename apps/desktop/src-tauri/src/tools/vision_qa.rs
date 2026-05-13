@@ -17,13 +17,13 @@
 use anyhow::{anyhow, Context, Result};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use parking_lot::Mutex;
-#[cfg(any(target_os = "linux", target_os = "macos"))]
-use std::process::Command;
-use std::collections::HashMap;
-use std::sync::OnceLock;
-use std::time::Duration;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+use std::process::Command;
+use std::sync::OnceLock;
+use std::time::Duration;
 use tauri::{AppHandle, Emitter, Runtime};
 use tokio::runtime::Handle;
 use tokio::sync::oneshot;
@@ -84,7 +84,8 @@ pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult
 fn capture_screen() -> Result<Vec<u8>> {
     let output = Command::new("/usr/sbin/screencapture")
         .arg("-x")
-        .arg("-t").arg("png")
+        .arg("-t")
+        .arg("png")
         .arg("-")
         .output()
         .context("invoke screencapture")?;
@@ -181,7 +182,11 @@ async fn capture_camera<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<u8>> {
 /// `Ok(())` if the request id was found; `Err` otherwise.
 pub fn deliver_camera_capture(request_id: &str, base64_png: &str) -> Result<()> {
     let bytes = STANDARD
-        .decode(base64_png.trim_start_matches("data:image/png;base64,").as_bytes())
+        .decode(
+            base64_png
+                .trim_start_matches("data:image/png;base64,")
+                .as_bytes(),
+        )
         .context("base64 decode camera bytes")?;
     let tx = bridge()
         .lock()
@@ -203,10 +208,7 @@ async fn upload_and_answer(question: String, image_png: Vec<u8>) -> Result<Strin
         .ok()
         .filter(|s| !s.is_empty())
         .ok_or_else(|| anyhow!("ATLAS_AGENT_TOKEN not set"))?;
-    let endpoint = format!(
-        "{}/v1/tools/vision_qa",
-        worker_url.trim_end_matches('/'),
-    );
+    let endpoint = format!("{}/v1/tools/vision_qa", worker_url.trim_end_matches('/'),);
 
     let part = reqwest::multipart::Part::bytes(image_png)
         .file_name("frame.png")

@@ -70,7 +70,9 @@ pub fn start_if_configured<R: Runtime>(app: &AppHandle<R>) -> Result<Option<Voic
             return Ok(None);
         }
     };
-    let api_key = env::var("ELEVENLABS_API_KEY").ok().filter(|s| !s.is_empty());
+    let api_key = env::var("ELEVENLABS_API_KEY")
+        .ok()
+        .filter(|s| !s.is_empty());
     let environment = env::var("ATLAS_ENV").ok().filter(|s| !s.is_empty());
 
     // Boot playback at 16kHz to match what our agent_config_v1 sets for
@@ -328,9 +330,7 @@ impl<R: Runtime> OrchestratorCallbacks<R> {
 
 impl<R: Runtime> SessionCallbacks for OrchestratorCallbacks<R> {
     fn on_init(&self, conversation_id: &str, output_audio_format: &str) {
-        log::info!(
-            "voice: session started {conversation_id} (agent_out={output_audio_format})"
-        );
+        log::info!("voice: session started {conversation_id} (agent_out={output_audio_format})");
         let _ = state::set(&self.app, AtlasState::Listening);
         let _ = self
             .app

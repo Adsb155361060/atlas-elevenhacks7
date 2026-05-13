@@ -57,7 +57,9 @@ pub fn take_execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolR
 }
 
 fn save<R: Runtime>(app: &AppHandle<R>, input: &TakeInput) -> Result<Note> {
-    let store = app.store(STORE_FILE).map_err(|e| anyhow!("open store: {e}"))?;
+    let store = app
+        .store(STORE_FILE)
+        .map_err(|e| anyhow!("open store: {e}"))?;
     let mut notes = load_all(&store);
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -66,7 +68,11 @@ fn save<R: Runtime>(app: &AppHandle<R>, input: &TakeInput) -> Result<Note> {
     let note = Note {
         id: format!("note_{now}"),
         body: input.body.trim().to_string(),
-        title: input.title.as_ref().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+        title: input
+            .title
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty()),
         tags: input
             .tags
             .clone()
@@ -117,12 +123,7 @@ pub fn list_execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolR
         .rev() // newest first
         .filter(|n| {
             if !q.is_empty() {
-                let hay = format!(
-                    "{} {}",
-                    n.title.as_deref().unwrap_or(""),
-                    n.body
-                )
-                .to_lowercase();
+                let hay = format!("{} {}", n.title.as_deref().unwrap_or(""), n.body).to_lowercase();
                 if !hay.contains(&q) {
                     return false;
                 }

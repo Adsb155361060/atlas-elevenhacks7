@@ -18,6 +18,7 @@ import { allowedTokens } from '../env.js';
 import { BraveSearchError, webSearch } from '../tools/web_search.js';
 import { MusicGenError, generateMusic } from '../tools/generate_music.js';
 import { ImageGenError, generateImage } from '../tools/generate_image.js';
+import { VisionQAError, visionQA } from '../tools/vision_qa.js';
 
 export const tools = new Hono<{ Bindings: Env }>();
 
@@ -203,6 +204,92 @@ tools.post('/generate_image', async (c) => {
     console.error('generate_image unexpected error:', err);
     return c.json(
       { error: { message: (err as Error).message ?? 'generate_image failed', type: 'internal_error' } },
+      500,
+    );
+  }
+});
+
+// ───────────────────────── vision_qa ─────────────────────────
+
+/**
+ * POST /v1/tools/vision_qa
+ *
+ * Multipart body:
+ *   question : string  — what to answer about the image (required)
+ *   image    : File    — png/jpeg/gif/webp, ≤ 5MB (required)
+ *
+ * Returns { answer, model }.
+ *
+ * The desktop's vision client tool captures a screenshot and POSTs it
+ * here. The Worker forwards to Anthropic vision and returns the spoken
+ * answer that the agent reads aloud.
+ */
+tools.post('/vision_qa', async (c) => {
+  if (!c.env.ANTHROPIC_API_KEY) {
+    return c.json(
+      { error: { message: 'ANTHROPIC_API_KEY not configured', type: 'configuration_error' } },
+      500,
+    );
+  }
+  let form: FormData;
+  try {
+    form = await c.req.formData();
+  } catch (err) {
+    return c.json(
+      {
+        error: {
+          message: `invalid multipart body: ${(err as Error).message}`,
+          type: 'invalid_request_error',
+        },
+      },
+      400,
+    );
+  }
+  const question = form.get('question');
+  const image = form.get('image');
+  if (typeof question !== 'string' || question.trim().length === 0) {
+    return c.json(
+      { error: { message: 'multipart field "question" is required', type: 'invalid_request_error' } },
+      400,
+    );
+  }
+  if (!(image instanceof File)) {
+    return c.json(
+      { error: { message: 'multipart field "image" must be a file', type: 'invalid_request_error' } },
+      400,
+    );
+  }
+  const buf = new Uint8Array(await image.arrayBuffer());
+  const media = image.type || 'image/png';
+  try {
+    const result = await visionQA(c.env, {
+      question,
+      image_bytes: buf,
+      media_type: media,
+    });
+    return c.json(result, 200);
+  } catch (err) {
+    if (err instanceof VisionQAError) {
+      const status: 400 | 401 | 413 | 415 | 429 | 502 =
+        err.status === 401 || err.status === 403
+          ? 401
+          : err.status === 413
+            ? 413
+            : err.status === 415
+              ? 415
+              : err.status === 429
+                ? 429
+                : err.status >= 400 && err.status < 500
+                  ? 400
+                  : 502;
+      return c.json(
+        { error: { message: err.message, type: 'upstream_error', code: `vision_${err.status}` } },
+        status,
+      );
+    }
+    console.error('vision_qa unexpected error:', err);
+    return c.json(
+      { error: { message: (err as Error).message ?? 'vision_qa failed', type: 'internal_error' } },
       500,
     );
   }

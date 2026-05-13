@@ -15,6 +15,7 @@
 mod launch_app;
 mod music_control;
 mod render_artifact;
+mod vision_qa;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -50,6 +51,7 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, name: &str, parameters: &Value) 
         "render_artifact" => render_artifact::execute(app, parameters),
         "launch_app" => launch_app::execute(app, parameters),
         "music_control" => music_control::execute(app, parameters),
+        "vision_qa" => vision_qa::execute(app, parameters),
         other => ToolResult::err(format!(
             "tool '{other}' is not implemented on the desktop client (Phase 1.x)"
         )),

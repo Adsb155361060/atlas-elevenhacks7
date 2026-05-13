@@ -143,6 +143,40 @@ const GENERATE_MUSIC: ToolSpec = {
   },
 };
 
+const VISION_QA: ToolSpec = {
+  name: 'vision_qa',
+  description:
+    "Look at the user's screen and answer a question about what's on it. Use whenever the user says 'what's on my screen', 'what does this error mean', 'read this for me', 'what's that icon', etc. The desktop captures a screenshot, the worker forwards it to Claude vision, and you get one or two sentences back. Then speak the answer plainly — don't add 'I see' or 'it looks like'.",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      question: {
+        type: 'string',
+        description:
+          "What you want answered about the screen. Be specific — 'what does the red error say' beats 'what's wrong'.",
+      },
+      source: {
+        type: 'string',
+        description: "Where to grab the image from. Default 'screen'; 'camera' lands in a later phase.",
+        enum: ['screen', 'camera'],
+        default: 'screen',
+      },
+    },
+    required: ['question'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      answer: { type: 'string' },
+    },
+    required: ['answer'],
+    additionalProperties: false,
+  },
+};
+
 const GENERATE_IMAGE: ToolSpec = {
   name: 'generate_image',
   description:
@@ -402,6 +436,7 @@ export const TOOL_REGISTRY: readonly ToolSpec[] = [
   WEB_SEARCH,
   GENERATE_MUSIC,
   GENERATE_IMAGE,
+  VISION_QA,
   RENDER_ARTIFACT,
   LAUNCH_APP,
   MUSIC_CONTROL,

@@ -18,14 +18,13 @@ import { Hono } from 'hono';
 import type { Env } from '../env.js';
 import { allowedTokens } from '../env.js';
 import { OpenAIChatRequest } from '../types/openai.js';
-import { openaiRequestToAnthropic } from '../claude/translate.js';
-import { streamMessages } from '../claude/client.js';
+import { openaiRequestToGemini } from '../gemini/translate.js';
+import { openGeminiStream } from '../gemini/client.js';
 import {
-  anthropicStreamToOpenAISSE,
   generateChatCompletionId,
   sseReadableStream,
-} from '../claude/sse.js';
-import { resolveAnthropicModel } from '../claude/router.js';
+} from '../gemini/sse.js';
+import { resolveGeminiModel } from '../gemini/router.js';
 
 export const chatCompletions = new Hono<{ Bindings: Env }>();
 
@@ -96,30 +95,27 @@ chatCompletions.post('/', async (c) => {
   }
 
   // ─── 3. Route model ───
-  const anthropicModel = resolveAnthropicModel(req.model, c.env);
+  const geminiModel = resolveGeminiModel(req.model, c.env);
 
   // ─── 4. Translate request ───
-  const params = openaiRequestToAnthropic(req, {
-    model: anthropicModel,
-    enablePromptCaching: true,
-  });
+  const params = openaiRequestToGemini(req, { model: geminiModel });
 
-  // ─── 5. Open Anthropic stream and bridge to OpenAI SSE ───
+  // ─── 5. Open Gemini stream and bridge to OpenAI SSE ───
   const id = generateChatCompletionId();
   const created = Math.floor(Date.now() / 1000);
 
-  type UpstreamIter = Awaited<ReturnType<typeof streamMessages>>;
+  type UpstreamIter = Awaited<ReturnType<typeof openGeminiStream>>;
   let upstream: UpstreamIter;
   try {
-    upstream = await streamMessages(c.env, params);
+    upstream = await openGeminiStream(c.env, geminiModel, params);
   } catch (err) {
-    console.error('anthropic upstream open failed:', err);
+    console.error('gemini upstream open failed:', err);
     return c.json(
       {
         error: {
           message: errorMessage(err),
           type: 'upstream_error',
-          code: 'anthropic_request_failed',
+          code: 'gemini_request_failed',
         },
       },
       502,
@@ -139,13 +135,10 @@ chatCompletions.post('/', async (c) => {
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
       'X-Atlas-Worker': c.env.WORKER_VERSION,
-      'X-Atlas-Model': anthropicModel,
+      'X-Atlas-Model': geminiModel,
     },
   });
 });
-
-// Expose the generator directly for tests / non-Worker contexts.
-export { anthropicStreamToOpenAISSE };
 
 function errorMessage(err: unknown): string {
   if (err && typeof err === 'object' && 'message' in err) {

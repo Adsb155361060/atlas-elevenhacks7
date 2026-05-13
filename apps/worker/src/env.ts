@@ -13,24 +13,30 @@ const NonEmpty = z.string().min(1);
 
 export const EnvSchema = z.object({
   // Secrets (wrangler secret put)
-  ANTHROPIC_API_KEY: NonEmpty,
+  GEMINI_API_KEY: NonEmpty.describe(
+    'Google AI Studio API key — backs /v1/chat/completions via the Gemini streaming endpoint.',
+  ),
   ALLOWED_AGENT_TOKENS: NonEmpty.describe(
     'Comma-separated list of acceptable Bearer tokens for the ElevenLabs custom-LLM endpoint. Use multiple to enable zero-downtime rotation.',
   ),
 
-  // Optional secrets — present once their respective phases land
+  // Optional secrets
+  ANTHROPIC_API_KEY: z.string().optional().describe(
+    'Optional. Required only if the legacy Anthropic-backed vision_qa route is still in use; the main chat path runs on Gemini.',
+  ),
   ELEVENLABS_API_KEY: z.string().optional(),
-  GEMINI_API_KEY: z.string().optional(),
   VOYAGE_API_KEY: z.string().optional(),
   BRAVE_SEARCH_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
 
   // Plain vars (wrangler.toml [vars])
   WORKER_VERSION: z.string().default('0.0.0'),
+  DEFAULT_LLM_MODEL: ModelId.default('gemini-2.5-flash'),
+  ROUTER_TOOL_MODEL: ModelId.default('gemini-2.5-flash'),
+  ROUTER_TRIAGE_MODEL: ModelId.default('gemini-2.5-flash-lite'),
+  // Legacy alias — still consumed by the Anthropic-backed vision_qa route.
   DEFAULT_ANTHROPIC_MODEL: ModelId.default('claude-opus-4-7'),
-  ROUTER_TOOL_MODEL: ModelId.default('claude-sonnet-4-6'),
-  ROUTER_TRIAGE_MODEL: ModelId.default('claude-haiku-4-5-20251001'),
-  DAILY_ANTHROPIC_BUDGET_USD: z.string().default('20'),
+  DAILY_LLM_BUDGET_USD: z.string().default('20'),
   RATE_LIMIT_PER_DAY: z.string().default('200'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error']).default('info'),
 

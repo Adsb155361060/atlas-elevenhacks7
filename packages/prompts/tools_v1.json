@@ -2,7 +2,7 @@
   "$generated_by": "packages/contracts/scripts/gen.ts",
   "$do_not_edit": "Edit packages/contracts/src/tools/index.ts and rerun pnpm gen.",
   "$version": "v1",
-  "count": 7,
+  "count": 9,
   "tools": [
     {
       "name": "web_search",
@@ -29,6 +29,71 @@
       }
     },
     {
+      "name": "generate_music",
+      "description": "Generate a short original music track via ElevenLabs Music. Use when the user asks for music ('make me a lo-fi loop', 'something cinematic'). After the tool returns, immediately call render_artifact with type=audio so the user can hear it. Don't try to describe the music in words — let the user listen.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Natural-language style + mood description (e.g., \"warm lo-fi hip-hop loop with vinyl crackle\")."
+          },
+          "duration_ms": {
+            "type": "integer",
+            "description": "Track length in milliseconds. 5000-180000 (5s-3min). Default 30000.",
+            "minimum": 5000,
+            "maximum": 180000,
+            "default": 30000
+          },
+          "instrumental": {
+            "type": "boolean",
+            "description": "When true, ElevenLabs is forbidden from adding vocals. Default false.",
+            "default": false
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "generate_image",
+      "description": "Generate an image from a text prompt via Gemini Imagen 3. Use whenever the user asks you to draw, generate, paint, or imagine something visual. After the tool returns, immediately call render_artifact with type=image so the user can see it.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "description": "Detailed scene description. More vivid = better output (\"a watercolour of a cat astronaut on Mars at sunset\")."
+          },
+          "aspect_ratio": {
+            "type": "string",
+            "description": "Output frame shape. Default 1:1 (square).",
+            "enum": [
+              "1:1",
+              "16:9",
+              "9:16",
+              "3:4",
+              "4:3"
+            ],
+            "default": "1:1"
+          },
+          "count": {
+            "type": "integer",
+            "description": "How many images to generate (1-4). Default 1.",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 1
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "render_artifact",
       "description": "Show the user a visual artifact in the Atlas main window (map, chart, list, image, code, markdown, table, search_results, tutorial). Use it alongside your spoken reply — the screen carries detail your voice shouldn't. Don't read the artifact aloud, just acknowledge what's appearing.",
       "input_schema": {
@@ -43,6 +108,7 @@
               "code",
               "markdown",
               "image",
+              "audio",
               "table",
               "search_results",
               "tutorial"

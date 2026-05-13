@@ -16,6 +16,8 @@ import { z } from 'zod';
 import type { Env } from '../env.js';
 import { allowedTokens } from '../env.js';
 import { BraveSearchError, webSearch } from '../tools/web_search.js';
+import { MusicGenError, generateMusic } from '../tools/generate_music.js';
+import { ImageGenError, generateImage } from '../tools/generate_image.js';
 
 export const tools = new Hono<{ Bindings: Env }>();
 
@@ -103,6 +105,104 @@ tools.post('/web_search', async (c) => {
           type: 'internal_error',
         },
       },
+      500,
+    );
+  }
+});
+
+// ───────────────────────── generate_music ─────────────────────────
+
+const MusicBody = z.object({
+  prompt: z.string().min(1, 'prompt is required'),
+  duration_ms: z.number().int().min(5000).max(180_000).optional(),
+  instrumental: z.boolean().optional(),
+});
+
+tools.post('/generate_music', async (c) => {
+  if (!c.env.ELEVENLABS_API_KEY) {
+    return c.json(
+      { error: { message: 'ELEVENLABS_API_KEY not configured', type: 'configuration_error' } },
+      500,
+    );
+  }
+  let parsed;
+  try {
+    const body = (await c.req.json()) as unknown;
+    parsed = MusicBody.parse(body);
+  } catch (err) {
+    const msg = err instanceof z.ZodError ? err.message : (err as Error).message;
+    return c.json({ error: { message: msg, type: 'invalid_request_error' } }, 400);
+  }
+  try {
+    const result = await generateMusic(c.env.ELEVENLABS_API_KEY, parsed);
+    return c.json(result, 200);
+  } catch (err) {
+    if (err instanceof MusicGenError) {
+      const status: 400 | 401 | 429 | 502 =
+        err.status === 401 || err.status === 403
+          ? 401
+          : err.status === 429
+            ? 429
+            : err.status >= 400 && err.status < 500
+              ? 400
+              : 502;
+      return c.json(
+        { error: { message: err.message, type: 'upstream_error', code: `elevenlabs_${err.status}` } },
+        status,
+      );
+    }
+    console.error('generate_music unexpected error:', err);
+    return c.json(
+      { error: { message: (err as Error).message ?? 'generate_music failed', type: 'internal_error' } },
+      500,
+    );
+  }
+});
+
+// ───────────────────────── generate_image ─────────────────────────
+
+const ImageBody = z.object({
+  prompt: z.string().min(1, 'prompt is required'),
+  aspect_ratio: z.enum(['1:1', '16:9', '9:16', '3:4', '4:3']).optional(),
+  count: z.number().int().min(1).max(4).optional(),
+});
+
+tools.post('/generate_image', async (c) => {
+  if (!c.env.GEMINI_API_KEY) {
+    return c.json(
+      { error: { message: 'GEMINI_API_KEY not configured', type: 'configuration_error' } },
+      500,
+    );
+  }
+  let parsed;
+  try {
+    const body = (await c.req.json()) as unknown;
+    parsed = ImageBody.parse(body);
+  } catch (err) {
+    const msg = err instanceof z.ZodError ? err.message : (err as Error).message;
+    return c.json({ error: { message: msg, type: 'invalid_request_error' } }, 400);
+  }
+  try {
+    const result = await generateImage(c.env.GEMINI_API_KEY, parsed);
+    return c.json(result, 200);
+  } catch (err) {
+    if (err instanceof ImageGenError) {
+      const status: 400 | 401 | 429 | 502 =
+        err.status === 401 || err.status === 403
+          ? 401
+          : err.status === 429
+            ? 429
+            : err.status >= 400 && err.status < 500
+              ? 400
+              : 502;
+      return c.json(
+        { error: { message: err.message, type: 'upstream_error', code: `gemini_${err.status}` } },
+        status,
+      );
+    }
+    console.error('generate_image unexpected error:', err);
+    return c.json(
+      { error: { message: (err as Error).message ?? 'generate_image failed', type: 'internal_error' } },
       500,
     );
   }

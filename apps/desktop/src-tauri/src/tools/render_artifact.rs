@@ -22,6 +22,7 @@ const KNOWN_TYPES: &[&str] = &[
     "code",
     "markdown",
     "image",
+    "audio",
     "table",
     "search_results",
     "tutorial",

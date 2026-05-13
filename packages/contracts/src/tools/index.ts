@@ -101,6 +101,92 @@ const WEB_SEARCH: ToolSpec = {
   },
 };
 
+const GENERATE_MUSIC: ToolSpec = {
+  name: 'generate_music',
+  description:
+    "Generate a short original music track via ElevenLabs Music. Use when the user asks for music ('make me a lo-fi loop', 'something cinematic'). After the tool returns, immediately call render_artifact with type=audio so the user can hear it. Don't try to describe the music in words — let the user listen.",
+  location: 'cloud',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      prompt: {
+        type: 'string',
+        description:
+          'Natural-language style + mood description (e.g., "warm lo-fi hip-hop loop with vinyl crackle").',
+      },
+      duration_ms: {
+        type: 'integer',
+        description: 'Track length in milliseconds. 5000-180000 (5s-3min). Default 30000.',
+        minimum: 5000,
+        maximum: 180_000,
+        default: 30_000,
+      },
+      instrumental: {
+        type: 'boolean',
+        description: 'When true, ElevenLabs is forbidden from adding vocals. Default false.',
+        default: false,
+      },
+    },
+    required: ['prompt'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      audio_data_uri: { type: 'string', description: 'data:audio/mpeg;base64,… playable in <audio>.' },
+      duration_ms: { type: 'integer' },
+      prompt: { type: 'string' },
+    },
+    required: ['audio_data_uri', 'duration_ms', 'prompt'],
+    additionalProperties: false,
+  },
+};
+
+const GENERATE_IMAGE: ToolSpec = {
+  name: 'generate_image',
+  description:
+    "Generate an image from a text prompt via Gemini Imagen 3. Use whenever the user asks you to draw, generate, paint, or imagine something visual. After the tool returns, immediately call render_artifact with type=image so the user can see it.",
+  location: 'cloud',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      prompt: {
+        type: 'string',
+        description: 'Detailed scene description. More vivid = better output ("a watercolour of a cat astronaut on Mars at sunset").',
+      },
+      aspect_ratio: {
+        type: 'string',
+        description: 'Output frame shape. Default 1:1 (square).',
+        enum: ['1:1', '16:9', '9:16', '3:4', '4:3'],
+        default: '1:1',
+      },
+      count: {
+        type: 'integer',
+        description: 'How many images to generate (1-4). Default 1.',
+        minimum: 1,
+        maximum: 4,
+        default: 1,
+      },
+    },
+    required: ['prompt'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      images: {
+        type: 'array',
+        items: { type: 'string', description: 'data:image/png;base64,…' },
+      },
+      prompt: { type: 'string' },
+    },
+    required: ['images', 'prompt'],
+    additionalProperties: false,
+  },
+};
+
 const RENDER_ARTIFACT: ToolSpec = {
   name: 'render_artifact',
   description:
@@ -119,6 +205,7 @@ const RENDER_ARTIFACT: ToolSpec = {
           'code',
           'markdown',
           'image',
+          'audio',
           'table',
           'search_results',
           'tutorial',
@@ -313,6 +400,8 @@ const SYSTEM_ACTION: ToolSpec = {
 
 export const TOOL_REGISTRY: readonly ToolSpec[] = [
   WEB_SEARCH,
+  GENERATE_MUSIC,
+  GENERATE_IMAGE,
   RENDER_ARTIFACT,
   LAUNCH_APP,
   MUSIC_CONTROL,

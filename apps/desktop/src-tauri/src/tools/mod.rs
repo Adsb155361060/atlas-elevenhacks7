@@ -12,6 +12,7 @@
 //! paired with on-screen detail. Phase 1.2–1.6 add `launch_app`,
 //! `music_control`, `open_path`, `find_files`, `system_action`.
 
+mod launch_app;
 mod render_artifact;
 
 use serde::{Deserialize, Serialize};
@@ -46,6 +47,7 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, name: &str, parameters: &Value) 
     log::info!("tools: dispatch '{name}'");
     match name {
         "render_artifact" => render_artifact::execute(app, parameters),
+        "launch_app" => launch_app::execute(app, parameters),
         other => ToolResult::err(format!(
             "tool '{other}' is not implemented on the desktop client (Phase 1.x)"
         )),

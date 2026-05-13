@@ -42,6 +42,8 @@ url = "2"
 # IVC voice cloning + voice prefs persistence (Phase 0.F)
 hound = "3"
 bytes = "1"
+# Tools — Phase 1
+fuzzy-matcher = "0.3"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

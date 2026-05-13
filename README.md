@@ -6,11 +6,63 @@ Built on four ElevenLabs primitives — **Conversational Agent** (orchestration)
 
 > Working name. The project will rename before public launch (ADR 0001). "Atlas" is the dev-time identifier.
 
+## For ElevenHacks 7 judges
+
+> **Three steps to demo Atlas on your MacBook.** No compilation, no Rust toolchain. Mac (Apple Silicon or Intel) running macOS 12.3+ is all you need.
+
+### 1. Download the bundle
+
+Grab the latest universal `.dmg` from the [Releases page](../../releases/latest) and drag **Atlas.app** into `/Applications`.
+
+The build is unsigned (no Apple Developer account — hackathon trade-off). First launch will trigger Gatekeeper:
+
+```text
+Right-click Atlas.app  →  Open  →  Open
+```
+
+You only need to do this once per machine. Subsequent launches open normally.
+
+### 2. Paste your keys
+
+Open Atlas. The first-run onboarding walks you through picking a voice. Before that flow can talk to Claude, two keys need to land in the app's config:
+
+1. **Anthropic key** — [console.anthropic.com/settings/keys](https://console.anthropic.com/settings/keys). Free $5 trial covers all demo turns.
+2. **ElevenLabs key** — [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys). Free tier covers the voice loop.
+
+Open `~/Library/Application Support/com.atlas.desktop/preferences.json` and paste the keys (or use the Settings panel in-app once you've completed onboarding).
+
+### 3. Try these voice queries
+
+After onboarding, click the tray icon (top-right menu bar) or press **⌘ + Shift + A** for push-to-talk. The breathing emerald dot means Atlas is listening.
+
+| Say this | Exercises |
+| --- | --- |
+| *"Hey Atlas, what's the weather in San Francisco tomorrow?"* | wake-word → web_search → audio summary + visual artifact |
+| *"Open Safari"* | launch_app fuzzy match across `/Applications` |
+| *"Play"* | music_control via osascript → controls Music.app or Spotify if open |
+| *"Pause"* | same — confirms the control round-trip |
+| *"What's twenty-seven times four?"* | general Q&A — no tool, just Claude |
+
+**What you should see:**
+
+- The tray icon changes colour as state transitions: idle → armed → listening → thinking → speaking.
+- A scrolling caption appears at the bottom of the main window showing both your transcript and Atlas's reply.
+- Search queries paint a results card on screen alongside the spoken summary.
+
+**Troubleshooting one-liners:**
+
+- **"Atlas can't be opened because Apple cannot check it for malicious software"** — that's the Gatekeeper warning. Right-click → Open → Open. One-time.
+- **Microphone permission prompt** — say yes. macOS gates this per-app.
+- **No tray icon visible** — Atlas runs hidden by default. Look for the round colour-dot in your menu bar (top-right of screen, next to Wi-Fi / Battery).
+- **"Hey Atlas" doesn't trigger** — wake-word recognition needs a custom `.onnx` we don't ship in the demo bundle. Use **⌘ + Shift + A** (push-to-talk) instead.
+
+A pre-recorded 90-second walkthrough lives at [`docs/demo-script.md`](./docs/demo-script.md).
+
 ## Status
 
-Pre-Phase-0 scaffold. See [`jarvis_build_plan.md`](../jarvis_build_plan.md) for the product spec and [`jarvis_dev_plan.md`](../jarvis_dev_plan.md) for the step-by-step execution plan.
+Phase 0 (voice loop + onboarding + settings) complete. Phase 1 (six voice command tools) in progress — `web_search`, `launch_app`, `music_control`, and `render_artifact` are live in this build; `find_files`, `open_path`, `system_action` land next. See [`jarvis_build_plan.md`](../jarvis_build_plan.md) for the product spec and [`jarvis_dev_plan.md`](../jarvis_dev_plan.md) for the step-by-step execution plan.
 
-## Quickstart (post-Phase-0)
+## Quickstart (developers — build from source)
 
 ```bash
 # One-time setup

@@ -137,10 +137,33 @@ pub fn discover_apps() -> Vec<AppEntry> {
     // /Applications listing → AppEntry { id=app-basename, name=app-name,
     // exec=name } so `open -a "<name>"` can resolve it. Cheap and avoids
     // parsing Info.plist; sufficient for fuzzy matching by name.
+    //
+    // We walk one level deep so we catch `/Applications/Utilities/Terminal.app`
+    // and `/System/Applications/Utilities/Activity Monitor.app`. Two levels
+    // would catch the rare `/Applications/Adobe XYZ/Subapp.app`; out of scope
+    // for V1.
     let mut entries = Vec::new();
     let mut seen = std::collections::HashSet::new();
-    for root in ["/Applications", "/System/Applications"] {
-        let Ok(read) = std::fs::read_dir(root) else {
+    let roots = ["/Applications", "/System/Applications"];
+    let mut to_visit: Vec<std::path::PathBuf> =
+        roots.iter().map(std::path::PathBuf::from).collect();
+
+    for root in &roots {
+        if let Ok(read) = std::fs::read_dir(root) {
+            for dent in read.flatten() {
+                let path = dent.path();
+                let is_app = path.extension().and_then(|e| e.to_str()) == Some("app");
+                let is_dir = path.is_dir();
+                if is_dir && !is_app {
+                    // Plain directory like Utilities/ — enqueue for one-level recursion.
+                    to_visit.push(path);
+                }
+            }
+        }
+    }
+
+    for dir in &to_visit {
+        let Ok(read) = std::fs::read_dir(dir) else {
             continue;
         };
         for dent in read.flatten() {

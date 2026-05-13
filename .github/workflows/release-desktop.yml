@@ -1,0 +1,85 @@
+name: release-desktop
+
+# Build the Atlas desktop bundle and attach to a GitHub Release.
+#
+# Trigger:
+#   - Tag push matching `v*` (e.g. `v0.1.0-judges`) builds + publishes.
+#   - workflow_dispatch lets you run it manually from the Actions tab to
+#     produce an unattached test artifact.
+#
+# Hackathon-shape: macOS only for now (the judges' surface). Linux + Windows
+# follow once we've validated this path.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write # to create + upload release assets
+
+jobs:
+  build-macos:
+    name: macOS universal (.dmg)
+    runs-on: macos-14
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Rust toolchain (with both apple targets for universal)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend typecheck
+        run: pnpm --filter @atlas/desktop typecheck
+
+      - name: Build Tauri (universal-apple-darwin)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional ad-hoc codesigning. If you set these repo secrets, the
+          # produced .dmg / .app is signed and judges skip the Gatekeeper
+          # right-click → Open dance. Without them the build still succeeds
+          # — unsigned bundle, documented workaround in the README.
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Atlas ${{ github.ref_name }} (judges build)'
+          releaseBody: |
+            Universal macOS bundle for ElevenHacks 7 judges.
+            See `README.md` → **For judges** section.
+
+            **First launch:** right-click the .app → Open → "Open" again at the
+            Gatekeeper prompt. This is a one-time hackathon trade-off — no
+            Apple Developer account, no notarization.
+          releaseDraft: false
+          prerelease: true
+          args: --target universal-apple-darwin

@@ -123,12 +123,63 @@ fn dispatch(input: &MusicInput) -> Result<String> {
 // ───────────────────────── macOS / Windows stubs ─────────────────────────
 
 #[cfg(target_os = "macos")]
-fn dispatch(_input: &MusicInput) -> Result<String> {
-    // Future Phase 1.3.x: MediaRemote via osascript or the private framework.
-    // Stub returns a clean error so the agent can apologise gracefully.
-    Err(anyhow!(
-        "macOS media control isn't wired yet — use Spotify or your keyboard's media keys"
-    ))
+fn dispatch(input: &MusicInput) -> Result<String> {
+    // We talk to whichever of Music.app / Spotify is "playing or paused"
+    // via osascript. AppleScript Bridge keeps us off private frameworks
+    // (MediaRemote requires entitlements + binary patching).
+    //
+    // The script picks the first running music app and runs the verb. If
+    // neither is open we surface a clean error so the agent can guide the
+    // user to open one first.
+    use std::process::Command;
+
+    let verb = match input.action {
+        Action::Play => "play".to_string(),
+        Action::Pause => "pause".to_string(),
+        Action::Next => "next track".to_string(),
+        Action::Previous => "previous track".to_string(),
+        Action::Volume => {
+            let value = input
+                .value
+                .ok_or_else(|| anyhow!("volume action needs a `value` (0-100)"))?;
+            let clamped = value.clamp(0.0, 100.0);
+            // Both Music.app and Spotify accept `set sound volume to N` (0-100).
+            format!("set sound volume to {clamped}")
+        }
+    };
+
+    let script = format!(
+        r#"
+        on isRunning(appName)
+            tell application "System Events" to (name of processes) contains appName
+        end isRunning
+        if isRunning("Music") then
+            tell application "Music" to {verb}
+            return "Music"
+        else if isRunning("Spotify") then
+            tell application "Spotify" to {verb}
+            return "Spotify"
+        else
+            error "no music app is running"
+        end if
+        "#
+    );
+
+    let output = Command::new("/usr/bin/osascript")
+        .arg("-e")
+        .arg(&script)
+        .output()
+        .context("invoke osascript")?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(anyhow!(
+            "osascript failed: {}",
+            if stderr.is_empty() { "(no stderr)".into() } else { stderr }
+        ));
+    }
+    let identity = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(format!("{verb} on {identity}"))
 }
 
 #[cfg(target_os = "windows")]

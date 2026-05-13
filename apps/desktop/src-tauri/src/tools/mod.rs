@@ -12,6 +12,7 @@
 //! paired with on-screen detail. Phase 1.2–1.6 add `launch_app`,
 //! `music_control`, `open_path`, `find_files`, `system_action`.
 
+mod calendar;
 mod clipboard;
 mod find_files;
 mod launch_app;
@@ -66,6 +67,7 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, name: &str, parameters: &Value) 
         "read_clipboard" => clipboard::read_execute(app, parameters),
         "write_clipboard" => clipboard::write_execute(app, parameters),
         "set_timer" => timer::execute(app, parameters),
+        "calendar_today" => calendar::execute(app, parameters),
         other => ToolResult::err(format!(
             "tool '{other}' is not implemented on the desktop client (Phase 1.x)"
         )),

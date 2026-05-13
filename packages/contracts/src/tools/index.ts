@@ -248,6 +248,36 @@ const WRITE_CLIPBOARD: ToolSpec = {
   },
 };
 
+const CALENDAR_TODAY: ToolSpec = {
+  name: 'calendar_today',
+  description:
+    "Read the user's calendar events for today (or a given date) from macOS Calendar.app. Use whenever they say 'what's on my schedule', 'what meetings do I have', 'am I free this afternoon', 'do I have anything at 3'. After the tool returns, summarise in one or two sentences ('two meetings — coffee with Sara at 10, design review at 2') AND call render_artifact type=table with the full list so they can glance at it.",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      date: {
+        type: 'string',
+        description: "Optional ISO date YYYY-MM-DD. Defaults to today in the user's local time.",
+      },
+    },
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      count: { type: 'integer' },
+      events: {
+        type: 'array',
+        items: { type: 'object', description: 'Calendar event', properties: {}, additionalProperties: true },
+      },
+    },
+    required: ['count', 'events'],
+    additionalProperties: false,
+  },
+};
+
 const SET_TIMER: ToolSpec = {
   name: 'set_timer',
   description:
@@ -587,6 +617,7 @@ export const TOOL_REGISTRY: readonly ToolSpec[] = [
   READ_CLIPBOARD,
   WRITE_CLIPBOARD,
   SET_TIMER,
+  CALENDAR_TODAY,
 ] as const;
 
 export const TOOL_NAMES: readonly string[] = TOOL_REGISTRY.map((t) => t.name);

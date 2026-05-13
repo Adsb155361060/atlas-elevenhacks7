@@ -69,6 +69,7 @@ pub fn app_info() -> AppInfo {
 #[tauri::command]
 pub fn settings_reset_all_data<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     crate::voice::preferences::reset(&app).map_err(|e| e.to_string())?;
+    crate::voice::memory::clear(&app).map_err(|e| e.to_string())?;
     // Best-effort: close any in-flight voice session so it doesn't keep using
     // the now-stale voice_id.
     if let Some(voice) = app.try_state::<crate::voice::VoiceHandle>() {

@@ -19,6 +19,7 @@
 mod capture;
 mod client;
 pub mod ivc;
+pub mod memory;
 mod playback;
 pub mod preferences;
 mod protocol;
@@ -179,6 +180,17 @@ async fn start_session<R: Runtime>(
         }
     }
 
+    // Inject recent_context from prior turns (Batch 4 memory). The agent
+    // sees this as a dynamic_variable in the system prompt — useful for
+    // "remember when I asked about X" follow-ups without any embedding
+    // infrastructure.
+    if let Some(ctx) = memory::recent_context(&app) {
+        config
+            .dynamic_variables
+            .insert("recent_context".to_string(), Value::String(ctx));
+        log::debug!("voice: injected recent_context into dynamic_variables");
+    }
+
     // Spawn the mic capture on a dedicated OS thread. cpal::Stream is !Send
     // on Linux ALSA, so we cannot hold the AgentCapture across an await on
     // tokio's multi-threaded runtime. The thread owns the stream for the
@@ -301,6 +313,7 @@ struct MicMeta {
 struct OrchestratorCallbacks<R: Runtime> {
     app: AppHandle<R>,
     first_audio: AtomicBool,
+    live_session: memory::LiveSession,
 }
 
 impl<R: Runtime> OrchestratorCallbacks<R> {
@@ -308,6 +321,7 @@ impl<R: Runtime> OrchestratorCallbacks<R> {
         Self {
             app,
             first_audio: AtomicBool::new(false),
+            live_session: memory::LiveSession::default(),
         }
     }
 }
@@ -326,12 +340,20 @@ impl<R: Runtime> SessionCallbacks for OrchestratorCallbacks<R> {
     fn on_user_transcript(&self, transcript: &str) {
         // User finished an utterance — Claude is now composing.
         let _ = state::set(&self.app, AtlasState::Thinking);
+        self.live_session.ingest_user(transcript);
         let _ = self
             .app
             .emit("atlas:transcript:user", transcript.to_string());
     }
 
     fn on_agent_response(&self, response: &str) {
+        self.live_session.ingest_agent(response);
+        // A completed user+agent pair gets appended to memory.
+        if let Some(turn) = self.live_session.take_completed() {
+            if let Err(err) = memory::append_turn(&self.app, turn) {
+                log::warn!("voice/memory: append failed: {err:#}");
+            }
+        }
         let _ = self
             .app
             .emit("atlas:transcript:agent", response.to_string());

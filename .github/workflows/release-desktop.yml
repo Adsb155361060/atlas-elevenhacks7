@@ -7,8 +7,8 @@ name: release-desktop
 #   - workflow_dispatch lets you run it manually from the Actions tab to
 #     produce an unattached test artifact.
 #
-# Hackathon-shape: macOS only for now (the judges' surface). Linux + Windows
-# follow once we've validated this path.
+# Hackathon-shape: macOS + Windows for judges. Linux follows once we've
+# validated this path.
 
 on:
   push:
@@ -76,12 +76,80 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Atlas ${{ github.ref_name }} (judges build)'
           releaseBody: |
-            Universal macOS bundle for ElevenHacks 7 judges.
-            See `README.md` → **For judges** section.
+            Universal macOS bundle + Windows x64 bundle for ElevenHacks 7
+            judges. See `README.md` → **For judges** section.
 
-            **First launch:** right-click the .app → Open → "Open" again at the
-            Gatekeeper prompt. This is a one-time hackathon trade-off — no
-            Apple Developer account, no notarization.
+            **macOS first launch:** right-click the .app → Open → "Open"
+            again at the Gatekeeper prompt.
+
+            **Windows first launch:** the SmartScreen prompt appears →
+            click "More info" → "Run anyway".
+
+            One-time hackathon trade-off — no Apple Developer / EV cert.
           releaseDraft: false
           prerelease: true
           args: --target universal-apple-darwin
+
+  build-windows:
+    name: Windows x64 (.msi + .exe)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri -> target
+
+      - name: pnpm install
+        run: pnpm install --frozen-lockfile
+
+      - name: Frontend typecheck
+        run: pnpm --filter @atlas/desktop typecheck
+
+      - name: Build Tauri (x86_64-pc-windows-msvc)
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Same Path A baked-config story as the macOS job.
+          ATLAS_BAKED_WORKER_URL: ${{ secrets.BAKED_WORKER_URL }}
+          ATLAS_BAKED_AGENT_TOKEN: ${{ secrets.BAKED_AGENT_TOKEN }}
+          ATLAS_BAKED_AGENT_ID: ${{ secrets.BAKED_AGENT_ID }}
+          ATLAS_BAKED_ELEVENLABS_API_KEY: ${{ secrets.BAKED_ELEVENLABS_API_KEY }}
+          # Intentionally unsigned. Judges will see a SmartScreen prompt on
+          # first launch — click "More info" → "Run anyway". Documented in
+          # README + release body.
+        with:
+          projectPath: apps/desktop
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Atlas ${{ github.ref_name }} (judges build)'
+          releaseBody: |
+            Universal macOS bundle + Windows x64 bundle for ElevenHacks 7
+            judges. See `README.md` → **For judges** section.
+
+            **macOS first launch:** right-click the .app → Open → "Open"
+            again at the Gatekeeper prompt.
+
+            **Windows first launch:** the SmartScreen prompt appears →
+            click "More info" → "Run anyway".
+
+            One-time hackathon trade-off — no Apple Developer / EV cert.
+          releaseDraft: false
+          prerelease: true
+          args: --target x86_64-pc-windows-msvc

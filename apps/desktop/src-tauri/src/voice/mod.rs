@@ -30,10 +30,38 @@ use std::collections::HashMap;
 use std::env;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Listener, Manager, Runtime};
 use tokio::sync::mpsc;
 
 use crate::state::{self, AtlasState, StateChannel};
+
+/// Sticky-wake idle window — after this much silence on both ends of the
+/// conversation, the session is closed and the cockpit returns to Idle.
+const SESSION_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+
+/// Verbal "go to sleep" phrases. Any case-insensitive substring match in a
+/// user transcript closes the session immediately so the cockpit returns to
+/// Idle without waiting for the inactivity timer.
+const STOP_PHRASES: &[&str] = &[
+    "stop listening",
+    "go to sleep",
+    "go idle",
+    "pause atlas",
+    "atlas pause",
+    "bye atlas",
+    "goodbye atlas",
+    "atlas goodbye",
+    "atlas stop",
+    "shut up atlas",
+    "that's all atlas",
+    "thanks atlas, that's all",
+];
+
+fn matches_stop_phrase(transcript: &str) -> bool {
+    let t = transcript.to_lowercase();
+    STOP_PHRASES.iter().any(|p| t.contains(p))
+}
 
 pub use client::{ClientCommand, SessionCallbacks, SessionConfig};
 
@@ -195,7 +223,7 @@ async fn start_session<R: Runtime>(
     // Set up channels + claim the active-session slot. All work that touches
     // the `tauri::State` borrow happens in this block; the borrow ends at the
     // block's close, before we await anything.
-    let (tx, rx, callbacks, mut config) = {
+    let (tx, rx, callbacks, last_activity, mut config) = {
         let voice = app
             .try_state::<VoiceHandle>()
             .ok_or_else(|| anyhow!("voice handle not managed"))?;
@@ -209,10 +237,17 @@ async fn start_session<R: Runtime>(
         let (tx, rx) = mpsc::unbounded_channel::<ClientCommand>();
         *voice.active_session_tx.lock() = Some(tx.clone());
 
-        let callbacks: Arc<dyn SessionCallbacks> =
-            Arc::new(OrchestratorCallbacks::new(app.clone()));
+        // Shared heartbeat that the callbacks bump on every meaningful event
+        // and the inactivity watcher reads to decide when to disengage.
+        let last_activity = Arc::new(parking_lot::Mutex::new(Instant::now()));
+
+        let callbacks: Arc<dyn SessionCallbacks> = Arc::new(OrchestratorCallbacks::new(
+            app.clone(),
+            last_activity.clone(),
+            tx.clone(),
+        ));
         let config = voice.config_template.clone();
-        (tx, rx, callbacks, config)
+        (tx, rx, callbacks, last_activity, config)
     };
 
     // Inject the user's chosen voice_id (Phase 0.F). If none is configured,
@@ -295,7 +330,36 @@ async fn start_session<R: Runtime>(
         }
     }
 
+    // Sticky-wake inactivity watcher. Spawned just before client::run; lives
+    // until session end (signalled via watcher_cancel_tx) or until it actively
+    // disengages the session by sending ClientCommand::Close.
+    let (watcher_cancel_tx, mut watcher_cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    let watcher_activity = last_activity.clone();
+    let watcher_cmd_tx = tx.clone();
+    tokio::spawn(async move {
+        loop {
+            let elapsed = watcher_activity.lock().elapsed();
+            let remaining = SESSION_IDLE_TIMEOUT.saturating_sub(elapsed);
+            if remaining.is_zero() {
+                log::info!(
+                    "voice: idle {}s — closing session",
+                    SESSION_IDLE_TIMEOUT.as_secs()
+                );
+                let _ = watcher_cmd_tx.send(ClientCommand::Close);
+                return;
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(remaining) => {} // re-check
+                _ = &mut watcher_cancel_rx => return,
+            }
+        }
+    });
+
     let result = client::run(config, callbacks, playback, rx, tx).await;
+
+    // Session loop is done — stop the inactivity watcher promptly so it
+    // doesn't survive across to the next wake.
+    let _ = watcher_cancel_tx.send(());
 
     // Tell the mic thread to release the audio device.
     let _ = shutdown_tx.send(());
@@ -373,15 +437,32 @@ struct OrchestratorCallbacks<R: Runtime> {
     app: AppHandle<R>,
     first_audio: AtomicBool,
     live_session: memory::LiveSession,
+    /// Shared "last user/agent activity" timestamp. The deadline watcher
+    /// reads it; the callbacks bump it on every meaningful event.
+    last_activity: Arc<parking_lot::Mutex<Instant>>,
+    /// Escape hatch into the ClientCommand queue — used to close the session
+    /// when the user utters a stop phrase.
+    cmd_tx: mpsc::UnboundedSender<ClientCommand>,
 }
 
 impl<R: Runtime> OrchestratorCallbacks<R> {
-    fn new(app: AppHandle<R>) -> Self {
+    fn new(
+        app: AppHandle<R>,
+        last_activity: Arc<parking_lot::Mutex<Instant>>,
+        cmd_tx: mpsc::UnboundedSender<ClientCommand>,
+    ) -> Self {
         Self {
             app,
             first_audio: AtomicBool::new(false),
             live_session: memory::LiveSession::default(),
+            last_activity,
+            cmd_tx,
         }
+    }
+
+    #[inline]
+    fn bump_activity(&self) {
+        *self.last_activity.lock() = Instant::now();
     }
 }
 
@@ -395,15 +476,23 @@ impl<R: Runtime> SessionCallbacks for OrchestratorCallbacks<R> {
     }
 
     fn on_user_transcript(&self, transcript: &str) {
+        self.bump_activity();
         // User finished an utterance — Claude is now composing.
         let _ = state::set(&self.app, AtlasState::Thinking);
         self.live_session.ingest_user(transcript);
         let _ = self
             .app
             .emit("atlas:transcript:user", transcript.to_string());
+        // Verbal disengage. Any of the STOP_PHRASES → close cleanly so the
+        // cockpit returns to Idle without waiting for the inactivity timer.
+        if matches_stop_phrase(transcript) {
+            log::info!("voice: stop phrase matched — closing session: {transcript:?}");
+            let _ = self.cmd_tx.send(ClientCommand::Close);
+        }
     }
 
     fn on_agent_response(&self, response: &str) {
+        self.bump_activity();
         self.live_session.ingest_agent(response);
         // A completed user+agent pair gets appended to memory.
         if let Some(turn) = self.live_session.take_completed() {
@@ -414,6 +503,12 @@ impl<R: Runtime> SessionCallbacks for OrchestratorCallbacks<R> {
         let _ = self
             .app
             .emit("atlas:transcript:agent", response.to_string());
+        // Sticky wake: now that the agent's text is complete, slide back to
+        // Listening so the cockpit reflects "waiting for next user turn"
+        // rather than staying frozen in Speaking. The session itself stays
+        // open — ElevenLabs Conv-AI is inherently multi-turn.
+        self.first_audio.store(false, Ordering::Release);
+        let _ = state::set(&self.app, AtlasState::Listening);
     }
 
     fn on_agent_response_correction(&self, _original: &str, corrected: &str) {
@@ -425,6 +520,7 @@ impl<R: Runtime> SessionCallbacks for OrchestratorCallbacks<R> {
     }
 
     fn on_first_audio(&self) {
+        self.bump_activity();
         if !self.first_audio.swap(true, Ordering::AcqRel) {
             let _ = state::set(&self.app, AtlasState::Speaking);
         }

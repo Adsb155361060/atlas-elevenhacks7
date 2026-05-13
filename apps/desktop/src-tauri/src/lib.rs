@@ -72,12 +72,11 @@ fn run_inner() -> Result<()> {
                 .context("tray::build")
                 .map_err(boxed)?;
 
-            // Main + mini windows both start hidden. Main surfaces on tray
-            // click; mini via the tray "Toggle mini overlay" menu entry or
-            // the `toggle_mini_window` Tauri command.
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.hide();
-            }
+            // Main window starts visible (declared in tauri.conf.json) so
+            // first-launch users on Windows — where the system tray hides
+            // behind the ^ overflow arrow — actually see the app. Mini
+            // overlay stays hidden; tray menu's "Toggle mini overlay"
+            // brings it up.
             if let Some(window) = app.get_webview_window(mini::MINI_LABEL) {
                 let _ = window.hide();
             }

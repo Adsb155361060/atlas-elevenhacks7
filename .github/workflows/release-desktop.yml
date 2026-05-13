@@ -3,12 +3,12 @@ name: release-desktop
 # Build the Atlas desktop bundle and attach to a GitHub Release.
 #
 # Trigger:
-#   - Tag push matching `v*` (e.g. `v0.1.0-judges`) builds + publishes.
+#   - Tag push matching `v*` (e.g. `v0.1.0`) builds + publishes.
 #   - workflow_dispatch lets you run it manually from the Actions tab to
 #     produce an unattached test artifact.
 #
-# Hackathon-shape: macOS + Windows for judges. Linux follows once we've
-# validated this path.
+# Targets macOS + Windows for now. Linux follows once we've validated
+# this path.
 
 on:
   push:
@@ -59,9 +59,9 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Path A — bake the four runtime config values into the binary.
           # `build.rs` reads these and writes `bundled_config.rs`; the app
-          # hydrates `std::env` from them at startup. Judges install →
-          # talk, no setup. Worker rate-limit caps abuse.
-          # See README "For judges" + ADR-style note in commit history.
+          # hydrates `std::env` from them at startup. Install → talk, no
+          # setup. Worker rate-limit caps abuse.
+          # See README "Quick start" + ADR-style note in commit history.
           ATLAS_BAKED_WORKER_URL: ${{ secrets.BAKED_WORKER_URL }}
           ATLAS_BAKED_AGENT_TOKEN: ${{ secrets.BAKED_AGENT_TOKEN }}
           ATLAS_BAKED_AGENT_ID: ${{ secrets.BAKED_AGENT_ID }}
@@ -69,15 +69,15 @@ jobs:
           # Intentionally unsigned. Adding the APPLE_* secrets here makes
           # tauri-action try to import a keychain certificate; with stale
           # / partial secrets that fails and breaks the whole build.
-          # Judges open the .app via right-click → Open (one-time
+          # Users open the .app via right-click → Open (one-time
           # Gatekeeper prompt). Documented in README + release body.
         with:
           projectPath: apps/desktop
           tagName: ${{ github.ref_name }}
-          releaseName: 'Atlas ${{ github.ref_name }} (judges build)'
+          releaseName: 'Atlas ${{ github.ref_name }}'
           releaseBody: |
-            Universal macOS bundle + Windows x64 bundle for ElevenHacks 7
-            judges. See `README.md` → **For judges** section.
+            Universal macOS bundle + Windows x64 bundle for Atlas.
+            See `README.md` → **Quick start** section.
 
             **macOS first launch:** right-click the .app → Open → "Open"
             again at the Gatekeeper prompt.
@@ -85,7 +85,7 @@ jobs:
             **Windows first launch:** the SmartScreen prompt appears →
             click "More info" → "Run anyway".
 
-            One-time hackathon trade-off — no Apple Developer / EV cert.
+            Unsigned early-release build — no Apple Developer / EV cert.
           releaseDraft: false
           prerelease: true
           args: --target universal-apple-darwin
@@ -132,16 +132,16 @@ jobs:
           ATLAS_BAKED_AGENT_TOKEN: ${{ secrets.BAKED_AGENT_TOKEN }}
           ATLAS_BAKED_AGENT_ID: ${{ secrets.BAKED_AGENT_ID }}
           ATLAS_BAKED_ELEVENLABS_API_KEY: ${{ secrets.BAKED_ELEVENLABS_API_KEY }}
-          # Intentionally unsigned. Judges will see a SmartScreen prompt on
+          # Intentionally unsigned. Users will see a SmartScreen prompt on
           # first launch — click "More info" → "Run anyway". Documented in
           # README + release body.
         with:
           projectPath: apps/desktop
           tagName: ${{ github.ref_name }}
-          releaseName: 'Atlas ${{ github.ref_name }} (judges build)'
+          releaseName: 'Atlas ${{ github.ref_name }}'
           releaseBody: |
-            Universal macOS bundle + Windows x64 bundle for ElevenHacks 7
-            judges. See `README.md` → **For judges** section.
+            Universal macOS bundle + Windows x64 bundle for Atlas.
+            See `README.md` → **Quick start** section.
 
             **macOS first launch:** right-click the .app → Open → "Open"
             again at the Gatekeeper prompt.
@@ -149,7 +149,7 @@ jobs:
             **Windows first launch:** the SmartScreen prompt appears →
             click "More info" → "Run anyway".
 
-            One-time hackathon trade-off — no Apple Developer / EV cert.
+            Unsigned early-release build — no Apple Developer / EV cert.
           releaseDraft: false
           prerelease: true
           args: --target x86_64-pc-windows-msvc

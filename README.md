@@ -6,27 +6,31 @@ Built on four ElevenLabs primitives — **Conversational Agent** (orchestration)
 
 > Working name. The project will rename before public launch (ADR 0001). "Atlas" is the dev-time identifier.
 
-## For ElevenHacks 7 judges
+## Quick start
 
-> **Three steps to demo Atlas on your MacBook.** No compilation, no Rust toolchain. Mac (Apple Silicon or Intel) running macOS 12.3+ is all you need.
+> **Three steps to try Atlas.** No compilation, no Rust toolchain — just the prebuilt bundle.
 
 ### 1. Download the bundle
 
-Grab the latest universal `.dmg` from the [Releases page](../../releases/latest) and drag **Atlas.app** into `/Applications`.
+Grab the latest installer from the [Releases page](../../releases/latest):
 
-The build is unsigned (no Apple Developer account — hackathon trade-off). First launch will trigger Gatekeeper:
+- **macOS** (Apple Silicon or Intel, macOS 12.3+) — `Atlas_0.0.1_universal.dmg`
+- **Windows** (10 / 11, x64) — `Atlas_0.0.1_x64-setup.exe` or the `.msi`
+
+Both builds are unsigned (no Apple Developer / EV cert — early-release trade-off). First launch:
 
 ```text
-Right-click Atlas.app  →  Open  →  Open
+macOS    Right-click Atlas.app  →  Open  →  Open
+Windows  SmartScreen → More info → Run anyway
 ```
 
-You only need to do this once per machine. Subsequent launches open normally.
+You only need to do this once per machine.
 
 ### 2. Run it
 
-That's it — no setup. The judges bundle ships with a working ElevenLabs agent + a rate-limited Cloudflare worker baked in, so the voice loop works on first launch. You'll see the onboarding wizard (pick a voice, read the privacy note) and then the home screen.
+That's it — no setup. The bundle ships with a working ElevenLabs agent + a rate-limited Cloudflare worker baked in, so the voice loop works on first launch. You'll see the onboarding wizard (pick a voice, read the privacy note) and then the home screen.
 
-Daily fair-use cap per IP is **200 requests** (~30–60 demo turns depending on whether you're using web search, image generation, or just chat). If you hit it, come back tomorrow or reach out to the hackathon team.
+Daily fair-use cap per IP is **200 requests** (~30–60 demo turns depending on whether you're using web search, image generation, or just chat).
 
 ### 3. Try these voice queries
 

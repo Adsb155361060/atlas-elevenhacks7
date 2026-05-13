@@ -37,6 +37,46 @@ use crate::state::{self, AtlasState, StateChannel};
 
 pub use client::{ClientCommand, SessionCallbacks, SessionConfig};
 
+/// One-shot diagnostic: list every input + output device cpal can see, so the
+/// log file makes mic-permission failures legible. On Windows, an empty input
+/// list almost always means the "Let desktop apps access your microphone"
+/// toggle is off.
+fn log_audio_device_snapshot() {
+    use cpal::traits::{DeviceTrait, HostTrait};
+    let host = cpal::default_host();
+
+    match host.input_devices() {
+        Ok(devs) => {
+            let names: Vec<String> = devs
+                .filter_map(|d| d.name().ok())
+                .collect();
+            if names.is_empty() {
+                log::warn!(
+                    "voice/audio: cpal sees ZERO input devices. On Windows, open Settings → Privacy & security → Microphone and turn on 'Let desktop apps access your microphone', then relaunch Atlas."
+                );
+            } else {
+                log::info!(
+                    "voice/audio: input devices ({}): {}",
+                    names.len(),
+                    names.join(", ")
+                );
+            }
+        }
+        Err(err) => log::warn!("voice/audio: input_devices() failed: {err}"),
+    }
+    match host.output_devices() {
+        Ok(devs) => {
+            let names: Vec<String> = devs.filter_map(|d| d.name().ok()).collect();
+            log::info!(
+                "voice/audio: output devices ({}): {}",
+                names.len(),
+                names.join(", ")
+            );
+        }
+        Err(err) => log::warn!("voice/audio: output_devices() failed: {err}"),
+    }
+}
+
 /// Live voice-loop runtime. Held in Tauri's managed state for the app
 /// lifetime. The actual `Playback` / `AgentCapture` are intentionally leaked
 /// (see module docs) so this struct is `Send + Sync` cleanly.
@@ -74,6 +114,11 @@ pub fn start_if_configured<R: Runtime>(app: &AppHandle<R>) -> Result<Option<Voic
         .ok()
         .filter(|s| !s.is_empty());
     let environment = env::var("ATLAS_ENV").ok().filter(|s| !s.is_empty());
+
+    // Snapshot the audio devices once at boot. If this list is empty in the
+    // log, we know cpal can't see a mic — almost always a Windows app-mic
+    // permission issue. Cheap and one-shot; not run per session.
+    log_audio_device_snapshot();
 
     // Boot playback at 16kHz to match what our agent_config_v1 sets for
     // `agent_output_audio_format` (pcm_16000). If the agent's actual config
@@ -230,10 +275,22 @@ async fn start_session<R: Runtime>(
         }
         Ok(Err(err)) => {
             clear_voice_tx(&app);
+            // Surface the capture failure to the UI so the user sees why
+            // wake briefly transitioned then idled — instead of staring
+            // at a silent app and wondering.
+            let msg = format!("{err:#}");
+            log::error!("voice/capture: failed to start — {msg}");
+            let _ = app.emit("voice:capture:error", msg);
+            let _ = state::set(&app, AtlasState::Idle);
             return Err(err.context("agent capture start"));
         }
         Err(_) => {
             clear_voice_tx(&app);
+            let _ = app.emit(
+                "voice:capture:error",
+                "internal: voice-mic init channel closed".to_string(),
+            );
+            let _ = state::set(&app, AtlasState::Idle);
             return Err(anyhow!("voice-mic init channel closed"));
         }
     }

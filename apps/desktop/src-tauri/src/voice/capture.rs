@@ -44,9 +44,7 @@ pub struct AgentCapture {
 impl AgentCapture {
     pub fn start(tx: UnboundedSender<ClientCommand>) -> Result<Self> {
         let host = cpal::default_host();
-        let device = host
-            .default_input_device()
-            .ok_or_else(|| anyhow!("no default audio input device"))?;
+        let device = pick_input_device(&host)?;
         let device_name = device.name().unwrap_or_else(|_| "unknown".into());
 
         let (config, sample_format) = pick_input_config(&device)?;
@@ -156,6 +154,50 @@ fn accumulate(acc: &Arc<Mutex<Vec<i16>>>, chunk: &[i16], tx: &UnboundedSender<Cl
             buf.clear();
             return;
         }
+    }
+}
+
+// ───────────────────────── device selection ──────────────────────────
+//
+// On a fresh Windows 11 box with mic permission set to "Allow desktop apps"
+// the default input device is present and `default_input_device()` returns
+// Some(...). But when the permission is **denied**, cpal's WASAPI backend
+// returns None — same as if the laptop had no mic. We try a couple of
+// fallbacks before giving up, and log every input device we saw so the log
+// file makes it obvious whether the device list is empty (no mic / no
+// permission) vs. just the "default" being unset.
+fn pick_input_device(host: &cpal::Host) -> Result<Device> {
+    if let Some(dev) = host.default_input_device() {
+        if let Ok(name) = dev.name() {
+            log::info!("voice/capture: using default input device '{name}'");
+        }
+        return Ok(dev);
+    }
+
+    log::warn!(
+        "voice/capture: cpal default_input_device() returned None — falling back to enumerated list"
+    );
+    let mut tried: Vec<String> = Vec::new();
+    if let Ok(devices) = host.input_devices() {
+        for dev in devices {
+            let name = dev.name().unwrap_or_else(|_| "(unnamed)".into());
+            tried.push(name.clone());
+            if dev.default_input_config().is_ok() {
+                log::info!("voice/capture: fallback to input device '{name}'");
+                return Ok(dev);
+            }
+        }
+    }
+
+    if tried.is_empty() {
+        Err(anyhow!(
+            "no audio input devices visible to the process — on Windows, check Settings → Privacy & security → Microphone → 'Let desktop apps access your microphone'"
+        ))
+    } else {
+        Err(anyhow!(
+            "no usable audio input device (saw: {}) — check OS mic permission",
+            tried.join(", ")
+        ))
     }
 }
 

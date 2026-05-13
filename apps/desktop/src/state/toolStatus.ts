@@ -12,6 +12,8 @@ interface ToolStatusStore {
   lastError: { tool_name: string; message: string; ts: number } | null;
   startCall: (call: { tool_name: string; tool_call_id: string }) => void;
   endCall: (call: { tool_call_id: string; is_error: boolean; error_message?: string; tool_name: string }) => void;
+  /** Push a non-tool error into the same toast channel (e.g. mic capture). */
+  pushError: (tool_name: string, message: string) => void;
   dismissError: () => void;
 }
 
@@ -33,5 +35,7 @@ export const useToolStatus = create<ToolStatusStore>((set) => ({
           ? { tool_name, message: error_message, ts: Date.now() }
           : s.lastError,
     })),
+  pushError: (tool_name, message) =>
+    set({ lastError: { tool_name, message, ts: Date.now() } }),
   dismissError: () => set({ lastError: null }),
 }));

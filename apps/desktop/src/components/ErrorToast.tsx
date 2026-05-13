@@ -20,6 +20,7 @@ const FRIENDLY_TOOL_NAME: Record<string, string> = {
   set_timer: 'timer',
   calendar_today: 'calendar',
   render_artifact: 'artifact rendering',
+  microphone: 'microphone',
 };
 
 export function ErrorToast() {
@@ -74,7 +75,7 @@ export function ErrorToast() {
               color: 'var(--signal-red)',
             }}
           >
-            {friendly} couldn't run
+            {friendly === 'microphone' ? 'microphone unavailable' : `${friendly} couldn't run`}
           </span>
           <button
             type="button"

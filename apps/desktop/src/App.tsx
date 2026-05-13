@@ -67,6 +67,7 @@ export function App() {
   const currentArtifact = useArtifact((s) => s.current);
   const startToolCall = useToolStatus((s) => s.startCall);
   const endToolCall = useToolStatus((s) => s.endCall);
+  const pushToolError = useToolStatus((s) => s.pushError);
   const setFirstRunDismissed = useFirstRun((s) => s.setDismissed);
 
   // The Rust agent emits voice:session_started with the ElevenLabs
@@ -110,6 +111,7 @@ export function App() {
     let unlistenArtifacts: (() => void) | undefined;
     let unlistenCamera: (() => void) | undefined;
     let unlistenToolStatus: (() => void) | undefined;
+    let unlistenCaptureError: (() => void) | undefined;
 
     void getState().then(setState).catch(() => undefined);
     subscribeToState(setState).then((fn) => {
@@ -140,6 +142,11 @@ export function App() {
     subscribeToToolStatus(startToolCall, endToolCall).then((fn) => {
       unlistenToolStatus = fn;
     });
+    listen<string>('voice:capture:error', (e) => {
+      pushToolError('microphone', e.payload);
+    }).then((fn) => {
+      unlistenCaptureError = fn;
+    });
 
     return () => {
       unlistenState?.();
@@ -150,6 +157,7 @@ export function App() {
       unlistenArtifacts?.();
       unlistenCamera?.();
       unlistenToolStatus?.();
+      unlistenCaptureError?.();
     };
   }, [
     setState,
@@ -160,6 +168,7 @@ export function App() {
     clearArtifacts,
     startToolCall,
     endToolCall,
+    pushToolError,
   ]);
 
   // Click-to-wake — anywhere on the cockpit (except buttons / data-no-wake

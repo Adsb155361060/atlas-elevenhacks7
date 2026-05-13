@@ -31,6 +31,7 @@ import { getPrefs } from './ipc/voice-prefs';
 import { subscribeToArtifacts } from './ipc/artifact';
 import { subscribeToCameraCaptures } from './ipc/camera';
 import { subscribeToToolStatus } from './ipc/toolStatus';
+import { requestMicrophonePermission } from './ipc/mic';
 import { HUD } from './components/HUD';
 import { OrbStage } from './components/OrbStage';
 import { CaptionRail } from './components/CaptionRail';
@@ -100,6 +101,27 @@ export function App() {
       .then((p) => setOnboardingCompleted(p.onboarding_completed))
       .catch(() => setOnboardingCompleted(false));
   }, [setOnboardingCompleted]);
+
+  // Prompt the OS for microphone access once onboarding is complete. On
+  // Windows + WebView2 this surfaces the system mic dialog; on macOS it
+  // triggers the TCC prompt. We release the stream immediately — cpal in
+  // the Rust voice-loop reopens it per session. If denied, the toast in
+  // ErrorToast offers a deep-link button to the OS mic settings.
+  useEffect(() => {
+    if (onboardingCompleted !== true) return;
+    let cancelled = false;
+    void requestMicrophonePermission().then((res) => {
+      if (cancelled) return;
+      if (res.ok) return;
+      const message = res.denied
+        ? 'Microphone access was denied. Open settings, allow Atlas to use the mic, then relaunch.'
+        : res.reason;
+      pushToolError('microphone', message);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [onboardingCompleted, pushToolError]);
 
   // Bootstrap + subscribe to all events.
   useEffect(() => {

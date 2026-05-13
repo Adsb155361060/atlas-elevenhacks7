@@ -69,6 +69,9 @@
     "category": "Productivity",
     "copyright": "Copyright (c) 2026 Atlas Contributors",
     "shortDescription": "Voice-first desktop AI assistant",
-    "longDescription": "Talk to your computer. It does anything. Built on ElevenLabs and Claude."
+    "longDescription": "Talk to your computer. It does anything. Built on ElevenLabs and Claude.",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
   }
 }

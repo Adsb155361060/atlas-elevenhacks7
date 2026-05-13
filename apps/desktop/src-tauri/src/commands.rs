@@ -44,6 +44,35 @@ pub fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Open the OS-level microphone privacy settings page. On Windows that
+/// deep-links into the Privacy → Microphone settings; on macOS, the
+/// Security & Privacy → Microphone pane. Linux falls back to logging a
+/// hint since the URI mechanism isn't standardized across DEs.
+#[tauri::command]
+pub fn open_mic_settings() -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("cmd")
+            .args(["/C", "start", "ms-settings:privacy-microphone"])
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
+            .spawn()
+            .map_err(|e| e.to_string())?;
+        Ok(())
+    }
+    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+    {
+        log::info!("open_mic_settings: not implemented on this OS — open your system's privacy panel manually");
+        Ok(())
+    }
+}
+
 #[derive(serde::Serialize)]
 pub struct AppInfo {
     pub version: String,

@@ -122,6 +122,7 @@ fn run_inner() -> Result<()> {
             commands::hide_main_window,
             commands::quit_app,
             commands::app_version,
+            commands::open_mic_settings,
             commands::voice_prefs_get,
             commands::voice_prefs_set,
             commands::voice_prefs_reset,

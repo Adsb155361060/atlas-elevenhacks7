@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useToolStatus } from '../state/toolStatus';
+import { openMicSettings } from '../ipc/mic';
 
 const AUTO_DISMISS_MS = 6_000;
 
@@ -111,6 +112,29 @@ export function ErrorToast() {
         >
           {lastError.message}
         </p>
+        {lastError.tool_name === 'microphone' ? (
+          <button
+            type="button"
+            onClick={() => {
+              void openMicSettings();
+            }}
+            className="mono"
+            style={{
+              marginTop: 12,
+              padding: '6px 14px',
+              background: 'var(--brass)',
+              color: 'var(--ink)',
+              border: 'none',
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+            }}
+          >
+            Open mic settings
+          </button>
+        ) : null}
       </div>
     </div>
   );

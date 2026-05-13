@@ -21,6 +21,11 @@
     "fs:default",
     "os:default",
     "log:default",
-    "global-shortcut:default"
+    "global-shortcut:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
+    "notification:default",
+    "notification:allow-notify"
   ]
 }

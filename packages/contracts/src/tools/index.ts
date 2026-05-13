@@ -143,6 +143,145 @@ const GENERATE_MUSIC: ToolSpec = {
   },
 };
 
+const TAKE_NOTE: ToolSpec = {
+  name: 'take_note',
+  description:
+    "Save a personal note locally for the user. Use when they say 'make a note', 'remind me later that', 'save this'. Notes persist across sessions and the user can recall them with list_notes. Body is required; title + tags optional.",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      body: { type: 'string', description: 'The note content as spoken-friendly prose.' },
+      title: { type: 'string', description: 'Optional short label.' },
+      tags: {
+        type: 'array',
+        description: 'Optional flat tag list for retrieval.',
+        items: { type: 'string', description: 'Single tag word.' },
+      },
+    },
+    required: ['body'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      saved: { type: 'boolean' },
+      id: { type: 'string' },
+    },
+    required: ['saved'],
+    additionalProperties: false,
+  },
+};
+
+const LIST_NOTES: ToolSpec = {
+  name: 'list_notes',
+  description:
+    "Recall saved notes. Use when the user asks 'what notes do I have', 'find my note about X', 'show my recent notes'. Returns newest-first. Filter by substring (query) or tag.",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Substring filter over title + body.' },
+      tag: { type: 'string', description: 'Exact tag match (case-insensitive).' },
+      limit: { type: 'integer', description: 'Max results 1-50. Default 10.', minimum: 1, maximum: 50, default: 10 },
+    },
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      count: { type: 'integer' },
+      notes: { type: 'array', items: { type: 'object', description: 'Note', properties: {}, additionalProperties: true } },
+    },
+    required: ['count', 'notes'],
+    additionalProperties: false,
+  },
+};
+
+const READ_CLIPBOARD: ToolSpec = {
+  name: 'read_clipboard',
+  description:
+    "Read the user's system clipboard. Use whenever the user says 'what did I just copy', 'translate what's on my clipboard', 'check my clipboard'. Returns up to 2000 chars; longer content is marked truncated.",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {},
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      text: { type: 'string' },
+      length: { type: 'integer' },
+      truncated: { type: 'boolean' },
+    },
+    required: ['text', 'length', 'truncated'],
+    additionalProperties: false,
+  },
+};
+
+const WRITE_CLIPBOARD: ToolSpec = {
+  name: 'write_clipboard',
+  description:
+    "Push text to the user's system clipboard. Use after you've generated code, an address, a phone number, or anything else they'd want to paste elsewhere. Don't read it aloud — just tell them it's copied.",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'The text to place on the clipboard.' },
+    },
+    required: ['text'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      written: { type: 'boolean' },
+      length: { type: 'integer' },
+    },
+    required: ['written'],
+    additionalProperties: false,
+  },
+};
+
+const SET_TIMER: ToolSpec = {
+  name: 'set_timer',
+  description:
+    "Set a one-shot countdown timer. Use when the user says 'set a 10-minute timer', 'remind me in an hour', 'wake me up in 25 minutes'. Range 5s-4h. The frontend shows a live countdown card; an OS notification + sound fires at zero.",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      seconds: {
+        type: 'integer',
+        description: 'Countdown length in seconds. 5-14400 (5s to 4h).',
+        minimum: 5,
+        maximum: 14_400,
+      },
+      label: {
+        type: 'string',
+        description: "What to call the timer when it fires. Defaults to 'Timer done'.",
+      },
+    },
+    required: ['seconds'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      scheduled: { type: 'boolean' },
+      seconds: { type: 'integer' },
+    },
+    required: ['scheduled'],
+    additionalProperties: false,
+  },
+};
+
 const VISION_QA: ToolSpec = {
   name: 'vision_qa',
   description:
@@ -443,6 +582,11 @@ export const TOOL_REGISTRY: readonly ToolSpec[] = [
   OPEN_PATH,
   FIND_FILES,
   SYSTEM_ACTION,
+  TAKE_NOTE,
+  LIST_NOTES,
+  READ_CLIPBOARD,
+  WRITE_CLIPBOARD,
+  SET_TIMER,
 ] as const;
 
 export const TOOL_NAMES: readonly string[] = TOOL_REGISTRY.map((t) => t.name);

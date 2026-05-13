@@ -12,12 +12,15 @@
 //! paired with on-screen detail. Phase 1.2–1.6 add `launch_app`,
 //! `music_control`, `open_path`, `find_files`, `system_action`.
 
+mod clipboard;
 mod find_files;
 mod launch_app;
 mod music_control;
+mod notes;
 mod open_path;
 mod render_artifact;
 mod system_action;
+mod timer;
 mod vision_qa;
 
 use serde::{Deserialize, Serialize};
@@ -58,6 +61,11 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, name: &str, parameters: &Value) 
         "open_path" => open_path::execute(app, parameters),
         "find_files" => find_files::execute(app, parameters),
         "system_action" => system_action::execute(app, parameters),
+        "take_note" => notes::take_execute(app, parameters),
+        "list_notes" => notes::list_execute(app, parameters),
+        "read_clipboard" => clipboard::read_execute(app, parameters),
+        "write_clipboard" => clipboard::write_execute(app, parameters),
+        "set_timer" => timer::execute(app, parameters),
         other => ToolResult::err(format!(
             "tool '{other}' is not implemented on the desktop client (Phase 1.x)"
         )),

@@ -49,6 +49,9 @@ fn run_inner() -> Result<()> {
         .plugin(tauri_plugin_os::init())
         // Global hotkey (registered in Phase 0.G)
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // Clipboard + notifications for the Batch-2 utility tools
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_notification::init())
         .setup(|app| {
             // Install the AtlasState watch channel into managed state.
             state::init(app.handle().clone())

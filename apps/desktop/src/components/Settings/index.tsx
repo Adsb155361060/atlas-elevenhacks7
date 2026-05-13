@@ -10,10 +10,23 @@ export function Settings() {
   const setView = useView((s) => s.setView);
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-100">
+    <div
+      className="cockpit-stage"
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        color: 'var(--cream)',
+      }}
+    >
       <Sidebar />
-      <main className="flex-1 px-10 py-10 overflow-y-auto">
-        <div className="max-w-2xl">
+      <main
+        style={{
+          flex: 1,
+          padding: '48px 56px',
+          overflowY: 'auto',
+        }}
+      >
+        <div style={{ maxWidth: 720 }}>
           {section === 'voice' ? (
             <Voice onPickAgain={() => setView('home')} />
           ) : null}

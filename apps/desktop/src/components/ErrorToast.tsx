@@ -37,22 +37,77 @@ export function ErrorToast() {
   const friendly = FRIENDLY_TOOL_NAME[lastError.tool_name] ?? lastError.tool_name;
 
   return (
-    <div className="fixed top-4 right-4 z-50 max-w-sm animate-fade-in">
-      <div className="px-4 py-3 rounded-md bg-rose-950/90 border border-rose-700/70 backdrop-blur-md shadow-lg">
-        <div className="flex items-baseline justify-between gap-3">
-          <span className="text-[10px] uppercase tracking-widest text-rose-300">
+    <div
+      style={{
+        position: 'fixed',
+        top: 16,
+        right: 16,
+        zIndex: 50,
+        maxWidth: 360,
+        animation: 'atlas-fade-in 220ms ease',
+      }}
+    >
+      <div
+        style={{
+          padding: '12px 16px',
+          background: 'rgba(20, 17, 14, 0.94)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid rgba(184, 88, 65, 0.5)',
+          borderLeft: '2px solid var(--signal-red)',
+          boxShadow: '0 12px 32px rgba(0, 0, 0, 0.5)',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 12,
+          }}
+        >
+          <span
+            className="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              color: 'var(--signal-red)',
+            }}
+          >
             {friendly} couldn't run
           </span>
           <button
             type="button"
             onClick={dismiss}
             aria-label="Dismiss"
-            className="text-rose-300 hover:text-rose-100 text-xs leading-none"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--cream-mute)',
+              fontSize: 14,
+              lineHeight: 1,
+              cursor: 'pointer',
+              padding: 0,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--cream)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--cream-mute)')}
           >
             ×
           </button>
         </div>
-        <p className="mt-1.5 text-xs text-rose-100 leading-relaxed line-clamp-3">
+        <p
+          className="serif-body"
+          style={{
+            margin: '8px 0 0',
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: 'var(--cream)',
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
           {lastError.message}
         </p>
       </div>

@@ -1,10 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useToolStatus } from '../state/toolStatus';
 
-/**
- * Tool-name → spoken-friendly verb. Mostly present participles so the chip
- * reads "Generating image…" / "Searching the web…" naturally.
- */
 const VERB_BY_TOOL: Record<string, string> = {
   web_search: 'Searching the web',
   generate_image: 'Generating an image',
@@ -27,8 +23,6 @@ const VERB_BY_TOOL: Record<string, string> = {
 export function ToolBadge() {
   const inflight = useToolStatus((s) => s.inflight);
 
-  // Crossfade: ToolBadge stays visible briefly after dispatch ends so quick
-  // tools don't flicker. Track the most-recent inflight separately.
   const [latest, setLatest] = useState<string | null>(null);
   useEffect(() => {
     if (inflight.length > 0) {
@@ -46,10 +40,40 @@ export function ToolBadge() {
   const verb = VERB_BY_TOOL[latest] ?? `Running ${latest}`;
 
   return (
-    <div className="fixed top-16 left-1/2 -translate-x-1/2 z-40 animate-fade-in">
-      <div className="flex items-center gap-3 px-4 py-2 rounded-full bg-slate-900/90 backdrop-blur-md border border-slate-700/60 shadow-lg">
+    <div
+      style={{
+        position: 'fixed',
+        top: 56,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 40,
+        animation: 'atlas-fade-in 220ms ease',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '8px 18px',
+          background: 'rgba(20, 17, 14, 0.92)',
+          backdropFilter: 'blur(8px)',
+          border: '1px solid var(--hair-strong)',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
+        }}
+      >
         <Spinner />
-        <span className="text-xs text-slate-200">{verb}…</span>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: 'var(--brass)',
+          }}
+        >
+          {verb}…
+        </span>
       </div>
     </div>
   );
@@ -58,15 +82,15 @@ export function ToolBadge() {
 function Spinner() {
   return (
     <svg
-      width="14"
-      height="14"
+      width="12"
+      height="12"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
-      className="text-emerald-400 animate-spin"
+      style={{ color: 'var(--brass)', animation: 'atlas-spin 1.1s linear infinite' }}
       aria-hidden="true"
     >
       <path d="M12 2v4" />

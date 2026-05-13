@@ -25,11 +25,43 @@ export function Done() {
       primary={{ label: 'Open Atlas', onClick: finish }}
       secondary={{ label: 'Back', onClick: back }}
     >
-      <div className="rounded-md border border-slate-800 bg-slate-900/40 px-5 py-4">
-        <h2 className="text-sm font-medium text-slate-100">Try it</h2>
-        <p className="mt-1.5 text-sm text-slate-400 leading-relaxed">
-          Say <span className="text-emerald-400 font-mono">"Hey Atlas"</span> any time, or hit the
-          global hotkey. The tray indicator pulses when Atlas is listening.
+      <div
+        style={{
+          border: '1px solid var(--hair-strong)',
+          background: 'rgba(20, 17, 14, 0.55)',
+          padding: '20px 22px',
+        }}
+      >
+        <p
+          className="mono"
+          style={{
+            margin: 0,
+            fontSize: 10,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: 'var(--brass)',
+          }}
+        >
+          Try it
+        </p>
+        <p
+          className="serif-body"
+          style={{
+            marginTop: 10,
+            fontSize: 15,
+            lineHeight: 1.55,
+            color: 'var(--cream-dim)',
+          }}
+        >
+          Say{' '}
+          <span className="mono" style={{ color: 'var(--brass)' }}>
+            "Hey Atlas"
+          </span>{' '}
+          any time, or hit{' '}
+          <span className="mono" style={{ color: 'var(--brass)' }}>
+            ⌘ + ⇧ + A
+          </span>
+          . The orb breathes brass when it's listening.
         </p>
       </div>
     </OnboardingShell>

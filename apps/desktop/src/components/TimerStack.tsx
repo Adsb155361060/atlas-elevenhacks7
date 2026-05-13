@@ -14,10 +14,6 @@ interface FireEvent {
   label: string;
 }
 
-/**
- * Bottom-right floating stack of countdown cards. One card per active
- * timer; auto-dismisses 8s after firing.
- */
 export function TimerStack() {
   const timers = useTimers((s) => s.timers);
   const start = useTimers((s) => s.start);
@@ -40,7 +36,6 @@ export function TimerStack() {
     listen<FireEvent>('atlas:timer:fire', (e) => {
       fire(e.payload.id);
       playChime();
-      // Auto-dismiss 8s after firing so the card doesn't linger.
       setTimeout(() => dismiss(e.payload.id), 8000);
     }).then((fn) => {
       un2 = fn;
@@ -55,7 +50,17 @@ export function TimerStack() {
   if (entries.length === 0) return null;
 
   return (
-    <div className="fixed bottom-32 right-6 space-y-2 z-50">
+    <div
+      style={{
+        position: 'fixed',
+        bottom: 128,
+        right: 24,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+        zIndex: 50,
+      }}
+    >
       {entries.map((t) => (
         <TimerCard key={t.id} timer={t} onDismiss={() => dismiss(t.id)} />
       ))}
@@ -74,41 +79,100 @@ function TimerCard({ timer, onDismiss }: { timer: ActiveTimer; onDismiss: () => 
   const remaining = Math.max(0, Math.ceil((timer.target_ms - now) / 1000));
   const pct = Math.min(
     100,
-    Math.max(0, ((timer.total_seconds * 1000 - (timer.target_ms - now)) / (timer.total_seconds * 1000)) * 100),
+    Math.max(
+      0,
+      ((timer.total_seconds * 1000 - (timer.target_ms - now)) /
+        (timer.total_seconds * 1000)) *
+        100,
+    ),
   );
 
   return (
     <div
-      className={[
-        'w-56 px-4 py-3 rounded-lg border backdrop-blur-md shadow-lg',
-        timer.fired
-          ? 'border-emerald-500/60 bg-emerald-950/70 animate-pulse'
-          : 'border-slate-800 bg-slate-900/85',
-      ].join(' ')}
+      style={{
+        width: 240,
+        padding: '14px 18px',
+        border: `1px solid ${timer.fired ? 'var(--brass)' : 'var(--hair-strong)'}`,
+        background: timer.fired ? 'rgba(201, 160, 79, 0.12)' : 'rgba(20, 17, 14, 0.92)',
+        backdropFilter: 'blur(8px)',
+        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.4)',
+        animation: timer.fired ? 'atlas-pulse 1.2s ease-in-out infinite' : undefined,
+      }}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] uppercase tracking-widest text-slate-500">
-          {timer.fired ? 'timer done' : 'timer'}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+        <span
+          className="mono"
+          style={{
+            fontSize: 9,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: timer.fired ? 'var(--brass)' : 'var(--cream-mute)',
+          }}
+        >
+          {timer.fired ? 'Timer · done' : 'Timer'}
         </span>
         <button
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss timer"
-          className="text-slate-500 hover:text-slate-200 text-xs leading-none"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--cream-mute)',
+            fontSize: 16,
+            lineHeight: 1,
+            cursor: 'pointer',
+            padding: 0,
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--cream)')}
+          onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--cream-mute)')}
         >
           ×
         </button>
       </div>
-      <p className="mt-1.5 text-sm font-medium text-slate-100 truncate">
+      <p
+        className="serif"
+        style={{
+          margin: '8px 0 0',
+          fontSize: 14,
+          fontStyle: 'italic',
+          color: 'var(--cream)',
+          fontVariationSettings: '"opsz" 36, "SOFT" 30',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+      >
         {timer.label}
       </p>
-      <p className="mt-1 text-2xl font-light tabular-nums text-slate-200">
+      <p
+        className="mono"
+        style={{
+          margin: '6px 0 0',
+          fontSize: 26,
+          fontWeight: 300,
+          fontVariantNumeric: 'tabular-nums',
+          color: 'var(--cream)',
+          letterSpacing: '0.04em',
+        }}
+      >
         {timer.fired ? '0:00' : formatRemaining(remaining)}
       </p>
-      <div className="mt-2 h-1 bg-slate-800 rounded-full overflow-hidden">
+      <div
+        style={{
+          marginTop: 10,
+          height: 2,
+          background: 'var(--hair-strong)',
+          overflow: 'hidden',
+        }}
+      >
         <div
-          className="h-full bg-emerald-500 transition-all duration-300"
-          style={{ width: `${pct}%` }}
+          style={{
+            height: '100%',
+            background: 'var(--brass)',
+            width: `${pct}%`,
+            transition: 'width 300ms ease',
+          }}
         />
       </div>
     </div>
@@ -126,9 +190,10 @@ function formatRemaining(seconds: number): string {
 }
 
 function playChime() {
-  // Tiny Web-Audio-API blip — three short beeps. No external assets.
   try {
-    const ctx = new (window.AudioContext || (window as typeof window & { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+    const ctx = new (window.AudioContext ||
+      (window as typeof window & { webkitAudioContext: typeof AudioContext })
+        .webkitAudioContext)();
     const t0 = ctx.currentTime;
     [0, 0.18, 0.36].forEach((offset) => {
       const osc = ctx.createOscillator();

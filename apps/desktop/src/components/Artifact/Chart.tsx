@@ -23,7 +23,7 @@ interface ChartData {
   title?: string;
 }
 
-const COLORS = ['#10b981', '#8b5cf6', '#f59e0b', '#ef4444', '#3b82f6'];
+const COLORS = ['#c9a04f', '#8fae9f', '#e8c77a', '#b85841', '#5c7a6b'];
 
 export function ChartArtifact({ data }: { data: unknown }) {
   const d = (data as ChartData) ?? {};
@@ -33,28 +33,56 @@ export function ChartArtifact({ data }: { data: unknown }) {
   const series = d.series ?? [];
 
   if (rows.length === 0 || series.length === 0) {
-    return <p className="text-sm text-slate-500">Empty chart.</p>;
+    return (
+      <p
+        className="mono"
+        style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--cream-faint)' }}
+      >
+        Empty chart
+      </p>
+    );
   }
 
   const ChartTag = variant === 'bar' ? BarChart : LineChart;
   return (
-    <div className="space-y-2">
-      {d.title ? <h3 className="text-sm font-medium text-slate-100">{d.title}</h3> : null}
-      <div className="rounded-md border border-slate-800 bg-slate-900/30 p-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {d.title ? (
+        <h3
+          className="serif"
+          style={{
+            margin: 0,
+            fontSize: 18,
+            fontStyle: 'italic',
+            color: 'var(--cream)',
+            fontVariationSettings: '"opsz" 36, "SOFT" 30',
+          }}
+        >
+          {d.title}
+        </h3>
+      ) : null}
+      <div
+        style={{
+          border: '1px solid var(--hair-strong)',
+          background: 'rgba(20, 17, 14, 0.65)',
+          padding: 14,
+        }}
+      >
         <ResponsiveContainer width="100%" height={280}>
           <ChartTag data={rows}>
-            <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
-            <XAxis dataKey={xKey} stroke="#94a3b8" fontSize={11} />
-            <YAxis stroke="#94a3b8" fontSize={11} />
+            <CartesianGrid stroke="rgba(244, 239, 230, 0.08)" strokeDasharray="3 3" />
+            <XAxis dataKey={xKey} stroke="#8a8377" fontSize={11} />
+            <YAxis stroke="#8a8377" fontSize={11} />
             <Tooltip
               contentStyle={{
-                background: '#0f172a',
-                border: '1px solid #1e293b',
-                borderRadius: 6,
+                background: '#14110e',
+                border: '1px solid rgba(244, 239, 230, 0.16)',
                 fontSize: 12,
+                color: '#f4efe6',
+                fontFamily: 'IBM Plex Mono',
               }}
+              cursor={{ stroke: 'rgba(201, 160, 79, 0.3)' }}
             />
-            <Legend wrapperStyle={{ fontSize: 11, color: '#cbd5e1' }} />
+            <Legend wrapperStyle={{ fontSize: 11, color: '#c8c0b2', fontFamily: 'IBM Plex Mono' }} />
             {series.map((key, i) =>
               variant === 'bar' ? (
                 <Bar key={key} dataKey={key} fill={COLORS[i % COLORS.length]} />

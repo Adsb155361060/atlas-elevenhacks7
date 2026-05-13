@@ -107,3 +107,77 @@ body {
     'SOFT' 30;
   letter-spacing: -0.005em;
 }
+
+@keyframes atlas-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+@keyframes atlas-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes atlas-spin {
+  to { transform: rotate(360deg); }
+}
+
+.atlas-markdown h1,
+.atlas-markdown h2,
+.atlas-markdown h3 {
+  font-family: var(--font-serif);
+  font-weight: 300;
+  font-style: italic;
+  font-variation-settings: 'opsz' 60, 'SOFT' 30;
+  letter-spacing: -0.015em;
+  color: var(--cream);
+  margin: 1.4em 0 0.5em;
+}
+.atlas-markdown h1 { font-size: 26px; }
+.atlas-markdown h2 { font-size: 21px; }
+.atlas-markdown h3 { font-size: 17px; }
+.atlas-markdown a { color: var(--brass); text-decoration: underline; text-decoration-color: var(--hair-strong); }
+.atlas-markdown a:hover { text-decoration-color: var(--brass); }
+.atlas-markdown code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--brass);
+  background: rgba(201, 160, 79, 0.08);
+  padding: 1px 5px;
+}
+.atlas-markdown pre {
+  background: rgba(20, 17, 14, 0.85);
+  border: 1px solid var(--hair);
+  padding: 14px 16px;
+  overflow-x: auto;
+}
+.atlas-markdown pre code {
+  background: transparent;
+  color: var(--cream-dim);
+  padding: 0;
+}
+.atlas-markdown strong { color: var(--cream); font-weight: 500; }
+.atlas-markdown ul, .atlas-markdown ol { padding-left: 22px; }
+.atlas-markdown li { margin: 4px 0; }
+.atlas-markdown blockquote {
+  border-left: 2px solid var(--brass);
+  padding-left: 14px;
+  color: var(--cream-mute);
+  font-style: italic;
+  margin: 1em 0;
+}
+.atlas-markdown table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+.atlas-markdown th, .atlas-markdown td {
+  border-bottom: 1px solid var(--hair);
+  padding: 8px 10px;
+  text-align: left;
+  font-size: 14px;
+}
+.atlas-markdown th {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cream-mute);
+  font-weight: 500;
+}

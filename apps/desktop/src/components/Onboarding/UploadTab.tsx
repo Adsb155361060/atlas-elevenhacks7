@@ -48,36 +48,68 @@ export function UploadTab({ onPicked }: UploadTabProps) {
     }
   };
 
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    letterSpacing: '0.22em',
+    textTransform: 'uppercase',
+    color: 'var(--cream-mute)',
+    marginBottom: 8,
+  };
+  const fieldStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 14px',
+    background: 'rgba(20, 17, 14, 0.55)',
+    border: '1px solid var(--hair-strong)',
+    color: 'var(--cream)',
+    fontSize: 14,
+    fontFamily: 'var(--font-serif)',
+    outline: 'none',
+  };
+
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
-          Voice name
-        </label>
+        <label style={labelStyle}>Voice name</label>
         <input
           type="text"
           value={voiceName}
           onChange={(e) => setVoiceName(e.target.value)}
           disabled={busy}
-          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-md text-sm focus:outline-none focus:border-emerald-500/60"
+          style={fieldStyle}
+          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--brass)')}
+          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--hair-strong)')}
         />
       </div>
 
       <div>
-        <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
-          Audio file
-        </label>
+        <label style={labelStyle}>Audio file</label>
         <input
           type="file"
           accept={ACCEPTED}
           onChange={onFileChange}
           disabled={busy}
-          className="block w-full text-sm text-slate-300 file:mr-3 file:px-3 file:py-2 file:bg-slate-900 file:border file:border-slate-800 file:rounded-md file:text-slate-200 file:text-xs hover:file:border-emerald-500/60"
+          className="mono"
+          style={{
+            display: 'block',
+            width: '100%',
+            fontSize: 12,
+            color: 'var(--cream-dim)',
+          }}
         />
         {filename ? (
-          <p className="mt-1.5 text-[11px] text-slate-500">
-            Selected: <span className="text-slate-300">{filename}</span>
-            {' '}({bytes ? Math.round(bytes.length / 1024) : 0} KB)
+          <p
+            className="mono"
+            style={{
+              marginTop: 8,
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              color: 'var(--cream-mute)',
+            }}
+          >
+            Selected: <span style={{ color: 'var(--cream)' }}>{filename}</span>{' '}
+            ({bytes ? Math.round(bytes.length / 1024) : 0} KB)
           </p>
         ) : null}
       </div>
@@ -86,12 +118,28 @@ export function UploadTab({ onPicked }: UploadTabProps) {
         type="button"
         onClick={submit}
         disabled={!bytes || busy}
-        className="w-full px-4 py-3 rounded-md bg-emerald-500 text-slate-950 font-medium text-sm hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-500 transition-colors"
+        className="mono"
+        style={{
+          width: '100%',
+          padding: '14px',
+          background: !bytes || busy ? 'var(--ink-3)' : 'var(--brass)',
+          color: !bytes || busy ? 'var(--cream-faint)' : 'var(--ink)',
+          border: 'none',
+          fontSize: 11,
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          fontWeight: 600,
+          cursor: !bytes || busy ? 'not-allowed' : 'pointer',
+        }}
       >
         {busy ? 'Uploading…' : 'Clone this voice'}
       </button>
 
-      {error ? <p className="text-sm text-rose-400">{error}</p> : null}
+      {error ? (
+        <p className="mono" style={{ fontSize: 11, color: 'var(--signal-red)' }}>
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -26,7 +26,14 @@ export function AudioArtifact({ data }: { data: unknown }) {
   }, [src, autoplay]);
 
   if (!src) {
-    return <p className="text-sm text-slate-500">No audio source provided.</p>;
+    return (
+      <p
+        className="mono"
+        style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--cream-faint)' }}
+      >
+        No audio source provided
+      </p>
+    );
   }
 
   const duration =
@@ -35,23 +42,51 @@ export function AudioArtifact({ data }: { data: unknown }) {
       : null;
 
   return (
-    <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {d.prompt || d.title ? (
-        <div className="space-y-0.5">
-          {d.title ? <h3 className="text-sm font-medium text-slate-100">{d.title}</h3> : null}
+        <div>
+          {d.title ? (
+            <h3
+              className="serif"
+              style={{
+                margin: 0,
+                fontSize: 18,
+                fontStyle: 'italic',
+                color: 'var(--cream)',
+                fontVariationSettings: '"opsz" 36, "SOFT" 30',
+              }}
+            >
+              {d.title}
+            </h3>
+          ) : null}
           {d.prompt ? (
-            <p className="text-xs text-slate-400 italic">"{d.prompt}"</p>
+            <p
+              className="serif-body"
+              style={{
+                margin: '4px 0 0',
+                fontSize: 13,
+                fontStyle: 'italic',
+                color: 'var(--cream-mute)',
+              }}
+            >
+              "{d.prompt}"
+            </p>
           ) : null}
         </div>
       ) : null}
-      <audio
-        ref={ref}
-        src={src}
-        controls
-        className="w-full"
-      />
+      <audio ref={ref} src={src} controls style={{ width: '100%' }} />
       {duration ? (
-        <p className="text-[10px] text-slate-600 text-right">
+        <p
+          className="mono"
+          style={{
+            margin: 0,
+            fontSize: 10,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: 'var(--cream-faint)',
+            textAlign: 'right',
+          }}
+        >
           duration {duration}
         </p>
       ) : null}

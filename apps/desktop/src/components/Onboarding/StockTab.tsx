@@ -47,33 +47,86 @@ export function StockTab({ onPicked }: StockTabProps) {
 
   if (error) {
     return (
-      <p className="text-sm text-rose-400">
+      <p className="mono" style={{ fontSize: 12, color: 'var(--signal-red)' }}>
         Couldn't load the voice library. {error}
       </p>
     );
   }
   if (voices === null) {
-    return <p className="text-sm text-slate-400">Loading voices…</p>;
+    return (
+      <p className="mono" style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--cream-mute)' }}>
+        Loading voices…
+      </p>
+    );
   }
   if (voices.length === 0) {
-    return <p className="text-sm text-slate-400">No voices available.</p>;
+    return (
+      <p className="mono" style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--cream-mute)' }}>
+        No voices available.
+      </p>
+    );
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+    <ul
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+        gap: 8,
+        maxHeight: 288,
+        overflowY: 'auto',
+        paddingRight: 4,
+        margin: 0,
+        listStyle: 'none',
+      }}
+    >
       {voices.map((v) => (
         <li key={v.voice_id}>
           <button
             type="button"
             onClick={() => choose(v)}
             disabled={busy !== null}
-            className="w-full text-left px-3 py-2.5 rounded-md border border-slate-800 hover:border-emerald-500/60 hover:bg-slate-900/60 disabled:opacity-50 transition-colors"
+            style={{
+              width: '100%',
+              textAlign: 'left',
+              padding: '10px 14px',
+              background: 'transparent',
+              border: '1px solid var(--hair-strong)',
+              color: 'var(--cream)',
+              cursor: busy !== null ? 'wait' : 'pointer',
+              opacity: busy !== null ? 0.5 : 1,
+              transition: 'all 180ms ease',
+            }}
+            onMouseEnter={(e) => {
+              if (busy === null) e.currentTarget.style.borderColor = 'var(--brass)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--hair-strong)';
+            }}
           >
-            <div className="text-sm font-medium text-slate-100 truncate">
+            <div
+              className="serif-body"
+              style={{
+                fontSize: 15,
+                color: 'var(--cream)',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {v.name}
             </div>
             {v.category ? (
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mt-0.5">
+              <div
+                className="mono"
+                style={{
+                  fontSize: 9,
+                  letterSpacing: '0.22em',
+                  textTransform: 'uppercase',
+                  color: 'var(--cream-faint)',
+                  marginTop: 2,
+                }}
+              >
                 {v.category}
               </div>
             ) : null}
@@ -82,7 +135,7 @@ export function StockTab({ onPicked }: StockTabProps) {
                 src={v.preview_url}
                 controls
                 preload="none"
-                className="mt-1.5 w-full h-8"
+                style={{ marginTop: 8, width: '100%', height: 28 }}
               />
             ) : null}
           </button>

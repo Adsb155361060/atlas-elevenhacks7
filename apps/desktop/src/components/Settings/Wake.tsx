@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useAtlasState, type AtlasUIState } from '../../state/store';
 import { setState as setBackendState } from '../../ipc/state';
+import { SettingsHeading, SettingsSubtitle, SettingsCard, SettingsLabel } from './primitives';
 
 const HOTKEY_BY_OS = (() => {
   const ua = navigator.userAgent;
-  if (/Macintosh|Mac OS X/.test(ua)) return '⌘ + Shift + A';
+  if (/Macintosh|Mac OS X/.test(ua)) return '⌘ + ⇧ + A';
   return 'Ctrl + Shift + A';
 })();
 
@@ -13,12 +14,8 @@ export function Wake() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // The wake-word module pauses itself when global AtlasState transitions to
-  // Paused. Toggling this switch is just toggling that state.
   const wakeEnabled = currentState !== 'paused';
 
-  // When the user pauses then unpauses, we want to return to 'idle' rather
-  // than whatever transitional state was active when they paused.
   const toggle = async (next: boolean) => {
     setBusy(true);
     setError(null);
@@ -32,50 +29,150 @@ export function Wake() {
     }
   };
 
-  // Reset transient error when state changes from elsewhere.
   useEffect(() => {
     setError(null);
   }, [currentState]);
 
   return (
     <section>
-      <h1 className="text-2xl font-light tracking-tight">Wake word</h1>
-      <p className="mt-1.5 text-sm text-slate-400">
-        Atlas listens for <span className="text-emerald-400 font-mono">"Hey Atlas"</span> when wake is on.
-        Pausing keeps the mic ignored unless you push-to-talk.
-      </p>
+      <SettingsHeading>Wake word</SettingsHeading>
+      <SettingsSubtitle>
+        Atlas listens for <span className="mono" style={{ color: 'var(--brass)' }}>"Hey Atlas"</span>{' '}
+        when wake is on. Pausing keeps the mic ignored unless you push-to-talk.
+      </SettingsSubtitle>
 
-      <label className="mt-6 flex items-center justify-between gap-4 rounded-md border border-slate-800 bg-slate-900/40 px-5 py-4 cursor-pointer">
-        <div>
-          <div className="text-base text-slate-100 font-medium">
-            Enable wake-word detection
+      <SettingsCard>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 24,
+            cursor: busy ? 'not-allowed' : 'pointer',
+          }}
+        >
+          <div style={{ flex: 1 }}>
+            <div
+              className="serif"
+              style={{
+                fontSize: 18,
+                fontStyle: 'italic',
+                color: 'var(--cream)',
+                fontVariationSettings: '"opsz" 36, "SOFT" 30',
+              }}
+            >
+              Enable wake-word detection
+            </div>
+            <div
+              className="serif-body"
+              style={{
+                fontSize: 13,
+                lineHeight: 1.5,
+                color: 'var(--cream-mute)',
+                marginTop: 6,
+              }}
+            >
+              When off, the on-device detector pauses. The push-to-talk hotkey still works.
+            </div>
           </div>
-          <div className="text-xs text-slate-500 mt-0.5">
-            When off, the on-device detector pauses. The push-to-talk hotkey still works.
+          <ToggleSwitch checked={wakeEnabled} disabled={busy} onChange={toggle} />
+        </label>
+      </SettingsCard>
+
+      <SettingsCard style={{ marginTop: 12 }}>
+        <SettingsLabel>Push-to-talk hotkey</SettingsLabel>
+        <div
+          style={{
+            marginTop: 8,
+            display: 'flex',
+            alignItems: 'baseline',
+            justifyContent: 'space-between',
+            gap: 16,
+          }}
+        >
+          <div
+            className="mono"
+            style={{
+              fontSize: 16,
+              color: 'var(--brass)',
+              letterSpacing: '0.05em',
+            }}
+          >
+            {HOTKEY_BY_OS}
+          </div>
+          <div
+            className="mono"
+            style={{
+              fontSize: 10,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: 'var(--cream-faint)',
+            }}
+          >
+            Rebinding · later phase
           </div>
         </div>
-        <input
-          type="checkbox"
-          checked={wakeEnabled}
-          disabled={busy}
-          onChange={(e) => toggle(e.target.checked)}
-          className="w-4 h-4 accent-emerald-500"
-        />
-      </label>
+      </SettingsCard>
 
-      <div className="mt-3 rounded-md border border-slate-800 bg-slate-900/40 px-5 py-4">
-        <div className="text-[10px] uppercase tracking-widest text-slate-500">
-          Push-to-talk hotkey
-        </div>
-        <div className="mt-1.5 flex items-baseline justify-between gap-4">
-          <div className="font-mono text-slate-200">{HOTKEY_BY_OS}</div>
-          <div className="text-[11px] text-slate-500">
-            Rebinding lands in a later phase
-          </div>
-        </div>
-      </div>
-
-      {error ? <p className="mt-3 text-sm text-rose-400">{error}</p> : null}
+      {error ? (
+        <p
+          className="mono"
+          style={{
+            marginTop: 16,
+            fontSize: 11,
+            letterSpacing: '0.16em',
+            textTransform: 'uppercase',
+            color: 'var(--signal-red)',
+          }}
+        >
+          {error}
+        </p>
+      ) : null}
     </section>
+  );
+}
+
+function ToggleSwitch({
+  checked,
+  disabled,
+  onChange,
+}: {
+  checked: boolean;
+  disabled?: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      style={{
+        width: 44,
+        height: 24,
+        borderRadius: 999,
+        border: `1px solid ${checked ? 'var(--brass)' : 'var(--hair-strong)'}`,
+        background: checked ? 'rgba(201, 160, 79, 0.25)' : 'rgba(20, 17, 14, 0.65)',
+        position: 'relative',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'all 220ms ease',
+        flexShrink: 0,
+        padding: 0,
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute',
+          top: 2,
+          left: checked ? 22 : 2,
+          width: 18,
+          height: 18,
+          borderRadius: 999,
+          background: checked ? 'var(--brass)' : 'var(--cream-mute)',
+          transition: 'left 220ms ease, background 220ms ease',
+        }}
+      />
+    </button>
   );
 }

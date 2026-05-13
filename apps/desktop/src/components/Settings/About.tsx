@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getAppInfo, type AppInfo } from '../../ipc/settings';
+import { SettingsHeading, SettingsSubtitle, SettingsCard } from './primitives';
 
 export function About() {
   const [info, setInfo] = useState<AppInfo | null>(null);
@@ -8,30 +9,71 @@ export function About() {
     getAppInfo().then(setInfo).catch(() => undefined);
   }, []);
 
+  const rows: Array<[string, string]> = [
+    ['Version', info?.version ?? '…'],
+    ['Platform', info ? `${info.target_os} / ${info.target_arch}` : '…'],
+    ['Build', info?.debug ? 'debug' : 'release'],
+  ];
+
   return (
     <section>
-      <h1 className="text-2xl font-light tracking-tight">About Atlas</h1>
-      <p className="mt-1.5 text-sm text-slate-400">
-        A voice-first desktop assistant. Built on ElevenLabs (Conversational Agent +
-        Scribe v2 + Flash v2.5 + Instant Voice Clone) and Claude.
-      </p>
+      <SettingsHeading>About Atlas</SettingsHeading>
+      <SettingsSubtitle>
+        A voice-first desktop assistant. Built on ElevenLabs (Conversational Agent + Scribe
+        v2 + Flash v2 + Instant Voice Clone) and Claude.
+      </SettingsSubtitle>
 
-      <dl className="mt-6 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-        <dt className="text-slate-500">Version</dt>
-        <dd className="text-slate-200 font-mono">{info?.version ?? '…'}</dd>
-        <dt className="text-slate-500">Platform</dt>
-        <dd className="text-slate-200 font-mono">
-          {info ? `${info.target_os} / ${info.target_arch}` : '…'}
-        </dd>
-        <dt className="text-slate-500">Build</dt>
-        <dd className="text-slate-200">{info?.debug ? 'debug' : 'release'}</dd>
-      </dl>
+      <SettingsCard>
+        <dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'max-content 1fr', rowGap: 12, columnGap: 32 }}>
+          {rows.map(([label, value]) => (
+            <Row key={label} label={label} value={value} />
+          ))}
+        </dl>
+      </SettingsCard>
 
-      <p className="mt-8 text-[11px] text-slate-600 leading-relaxed max-w-md">
-        ATLAS is the dev-time working name. The public name will change before public
-        launch (ADR 0001). The accessibility-first wedge is the lead positioning
-        (ADR 0002).
+      <p
+        className="serif-body"
+        style={{
+          marginTop: 32,
+          fontSize: 12,
+          lineHeight: 1.6,
+          color: 'var(--cream-faint)',
+          maxWidth: 540,
+          fontStyle: 'italic',
+        }}
+      >
+        ATLAS is the dev-time working name. The public name will change before public launch
+        (ADR 0001). The accessibility-first wedge is the lead positioning (ADR 0002).
       </p>
     </section>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <dt
+        className="mono"
+        style={{
+          fontSize: 10,
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          color: 'var(--cream-mute)',
+          alignSelf: 'center',
+        }}
+      >
+        {label}
+      </dt>
+      <dd
+        className="mono"
+        style={{
+          margin: 0,
+          fontSize: 13,
+          color: 'var(--cream)',
+        }}
+      >
+        {value}
+      </dd>
+    </>
   );
 }

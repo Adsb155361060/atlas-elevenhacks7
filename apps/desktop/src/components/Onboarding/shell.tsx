@@ -11,43 +11,123 @@ interface ShellProps {
 }
 
 /**
- * Shared chrome for every onboarding screen: progress dots, title block,
- * content slot, and a sticky action row at the bottom.
+ * Shared chrome for every onboarding screen — brass-and-ink edition.
+ * Progress dots top-left, big serif title, content slot, sticky action row
+ * with brass primary + ghost secondary. Same cockpit-stage grain backdrop
+ * as the main app so onboarding feels continuous, not a separate world.
  */
 export function OnboardingShell(props: ShellProps) {
   const { step, total, title, subtitle, children, primary, secondary } = props;
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-      <header className="pt-6 px-8 flex items-center gap-2">
+    <div
+      className="cockpit-stage"
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        color: 'var(--cream)',
+      }}
+    >
+      <header
+        style={{
+          padding: '32px 48px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
         {Array.from({ length: total }).map((_, i) => (
           <span
             key={i}
             aria-hidden="true"
-            className={[
-              'h-1.5 rounded-full transition-all',
-              i === step ? 'w-12 bg-emerald-500' : 'w-6 bg-slate-700',
-            ].join(' ')}
+            style={{
+              height: 2,
+              width: i === step ? 48 : 24,
+              background: i === step ? 'var(--brass)' : 'var(--cream-faint)',
+              transition: 'all 280ms ease',
+              display: 'inline-block',
+            }}
           />
         ))}
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center px-8 py-10">
-        <div className="w-full max-w-xl">
-          <h1 className="text-3xl font-light tracking-tight">{title}</h1>
+      <main
+        style={{
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '40px 48px',
+        }}
+      >
+        <div style={{ width: '100%', maxWidth: 640 }}>
+          <h1
+            className="serif"
+            style={{
+              fontSize: 40,
+              fontWeight: 300,
+              fontVariationSettings: '"opsz" 60, "SOFT" 30, "WONK" 1',
+              letterSpacing: '-0.015em',
+              lineHeight: 1.1,
+              margin: 0,
+              color: 'var(--cream)',
+            }}
+          >
+            {title}
+          </h1>
           {subtitle ? (
-            <p className="mt-3 text-slate-400 text-base leading-relaxed">{subtitle}</p>
+            <p
+              className="serif-body"
+              style={{
+                marginTop: 14,
+                fontSize: 17,
+                lineHeight: 1.55,
+                color: 'var(--cream-mute)',
+                maxWidth: 540,
+              }}
+            >
+              {subtitle}
+            </p>
           ) : null}
-          <div className="mt-8">{children}</div>
+          <div style={{ marginTop: 36 }}>{children}</div>
         </div>
       </main>
 
-      <footer className="px-8 pb-8 flex items-center justify-between border-t border-slate-800/60 pt-5">
+      <footer
+        style={{
+          padding: '20px 48px 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderTop: '1px solid var(--hair)',
+        }}
+      >
         <div>
           {secondary ? (
             <button
               type="button"
               onClick={secondary.onClick}
-              className="text-sm text-slate-400 hover:text-slate-200 px-3 py-2 rounded transition-colors"
+              className="mono"
+              style={{
+                background: 'transparent',
+                border: '1px solid var(--hair-strong)',
+                color: 'var(--cream-mute)',
+                fontSize: 11,
+                letterSpacing: '0.18em',
+                textTransform: 'uppercase',
+                padding: '10px 16px',
+                cursor: 'pointer',
+                transition: 'all 180ms ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--brass)';
+                e.currentTarget.style.color = 'var(--cream)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--hair-strong)';
+                e.currentTarget.style.color = 'var(--cream-mute)';
+              }}
             >
               {secondary.label}
             </button>
@@ -57,7 +137,22 @@ export function OnboardingShell(props: ShellProps) {
           type="button"
           onClick={primary.onClick}
           disabled={primary.disabled}
-          className="text-sm font-medium px-5 py-2.5 rounded-md bg-emerald-500 text-slate-950 hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-500 disabled:cursor-not-allowed transition-colors"
+          className="mono"
+          style={{
+            background: primary.disabled ? 'var(--ink-3)' : 'var(--brass)',
+            color: primary.disabled ? 'var(--cream-faint)' : 'var(--ink)',
+            border: 'none',
+            fontSize: 11,
+            letterSpacing: '0.18em',
+            textTransform: 'uppercase',
+            fontWeight: 600,
+            padding: '12px 28px',
+            cursor: primary.disabled ? 'not-allowed' : 'pointer',
+            transition: 'all 180ms ease',
+            boxShadow: primary.disabled
+              ? 'none'
+              : '0 0 24px rgba(201, 160, 79, 0.25)',
+          }}
         >
           {primary.label}
         </button>

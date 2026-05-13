@@ -21,18 +21,54 @@ export function ArtifactSurface() {
   return (
     <section
       key={`${current.id}-v${current.version}`}
-      className="w-full max-w-3xl mx-auto rounded-lg border border-slate-800 bg-slate-900/40 p-5 animate-fade-in"
       aria-label="atlas artifact"
+      style={{
+        width: '100%',
+        maxWidth: 760,
+        margin: '0 auto',
+        border: '1px solid var(--hair-strong)',
+        background: 'rgba(20, 17, 14, 0.55)',
+        padding: '24px 28px',
+        animation: 'atlas-fade-in 280ms ease',
+      }}
     >
-      <header className="flex items-baseline justify-between mb-4">
-        <div className="text-[10px] uppercase tracking-widest text-slate-500">
+      <header
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          gap: 24,
+          marginBottom: 18,
+        }}
+      >
+        <div
+          className="mono"
+          style={{
+            fontSize: 10,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: 'var(--brass)',
+          }}
+        >
           {current.kind.replace(/_/g, ' ')}
           {current.version > 1 ? (
-            <span className="ml-2 text-emerald-400">· v{current.version}</span>
+            <span style={{ marginLeft: 8, color: 'var(--cream-mute)' }}>
+              · v{current.version}
+            </span>
           ) : null}
         </div>
         {current.narration ? (
-          <p className="text-xs text-slate-400 italic max-w-md text-right">
+          <p
+            className="serif-body"
+            style={{
+              margin: 0,
+              fontSize: 13,
+              fontStyle: 'italic',
+              color: 'var(--cream-mute)',
+              maxWidth: 420,
+              textAlign: 'right',
+            }}
+          >
             {current.narration}
           </p>
         ) : null}
@@ -64,7 +100,18 @@ function Body({ kind, data }: { kind: string; data: unknown }) {
       return <TutorialArtifact data={data} />;
     default:
       return (
-        <pre className="text-xs text-slate-400 overflow-x-auto bg-slate-950/60 p-3 rounded">
+        <pre
+          className="mono"
+          style={{
+            fontSize: 11,
+            color: 'var(--cream-mute)',
+            overflowX: 'auto',
+            background: 'rgba(20, 17, 14, 0.85)',
+            border: '1px solid var(--hair)',
+            padding: 12,
+            margin: 0,
+          }}
+        >
           {JSON.stringify(data, null, 2)}
         </pre>
       );

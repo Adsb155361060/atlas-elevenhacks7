@@ -57,28 +57,55 @@ export function RecordTab({ onPicked }: RecordTabProps) {
     }
   };
 
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontFamily: 'var(--font-mono)',
+    fontSize: 10,
+    letterSpacing: '0.22em',
+    textTransform: 'uppercase',
+    color: 'var(--cream-mute)',
+    marginBottom: 8,
+  };
+  const fieldStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '10px 14px',
+    background: 'rgba(20, 17, 14, 0.55)',
+    border: '1px solid var(--hair-strong)',
+    color: 'var(--cream)',
+    fontSize: 14,
+    fontFamily: 'var(--font-serif)',
+    outline: 'none',
+    transition: 'border-color 180ms ease',
+  };
+  const helpStyle: React.CSSProperties = {
+    marginTop: 8,
+    fontSize: 11,
+    color: 'var(--cream-faint)',
+    fontFamily: 'var(--font-serif)',
+    lineHeight: 1.5,
+  };
+
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       <div>
-        <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
-          Voice name
-        </label>
+        <label style={labelStyle}>Voice name</label>
         <input
           type="text"
           value={voiceName}
           onChange={(e) => setVoiceName(e.target.value)}
           disabled={recording}
-          className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-md text-sm focus:outline-none focus:border-emerald-500/60"
+          style={fieldStyle}
+          onFocus={(e) => (e.currentTarget.style.borderColor = 'var(--brass)')}
+          onBlur={(e) => (e.currentTarget.style.borderColor = 'var(--hair-strong)')}
         />
-        <p className="mt-1.5 text-[11px] text-slate-500">
-          Pick anything that helps you tell voices apart later — your partner's name, "calm version of me", etc.
+        <p style={helpStyle}>
+          Pick anything that helps you tell voices apart later — your partner's name, "calm
+          version of me", etc.
         </p>
       </div>
 
       <div>
-        <label className="block text-xs uppercase tracking-wider text-slate-500 mb-1">
-          Duration ({seconds}s)
-        </label>
+        <label style={labelStyle}>Duration ({seconds}s)</label>
         <input
           type="range"
           min={15}
@@ -87,9 +114,9 @@ export function RecordTab({ onPicked }: RecordTabProps) {
           value={seconds}
           onChange={(e) => setSeconds(Number(e.target.value))}
           disabled={recording}
-          className="w-full"
+          style={{ width: '100%', accentColor: '#c9a04f' }}
         />
-        <p className="mt-1.5 text-[11px] text-slate-500">
+        <p style={helpStyle}>
           ElevenLabs IVC works best with 30 seconds of natural speech. Speak normally — mix
           calm with expressive — and avoid heavy background noise.
         </p>
@@ -99,7 +126,20 @@ export function RecordTab({ onPicked }: RecordTabProps) {
         type="button"
         onClick={start}
         disabled={recording}
-        className="w-full px-4 py-3 rounded-md bg-emerald-500 text-slate-950 font-medium text-sm hover:bg-emerald-400 disabled:bg-slate-700 disabled:text-slate-500 transition-colors"
+        className="mono"
+        style={{
+          width: '100%',
+          padding: '14px',
+          background: recording ? 'var(--ink-3)' : 'var(--brass)',
+          color: recording ? 'var(--cream-faint)' : 'var(--ink)',
+          border: 'none',
+          fontSize: 11,
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          fontWeight: 600,
+          cursor: recording ? 'wait' : 'pointer',
+          transition: 'background 180ms ease',
+        }}
       >
         {recording
           ? `Recording… ${remaining ?? seconds}s`
@@ -108,9 +148,18 @@ export function RecordTab({ onPicked }: RecordTabProps) {
             : 'Start recording'}
       </button>
 
-      {error ? <p className="text-sm text-rose-400">{error}</p> : null}
+      {error ? (
+        <p className="mono" style={{ fontSize: 11, color: 'var(--signal-red)' }}>
+          {error}
+        </p>
+      ) : null}
       {success && !recording ? (
-        <p className="text-sm text-emerald-400">Cloned voice saved. Continue when ready.</p>
+        <p
+          className="mono"
+          style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--sage)' }}
+        >
+          Cloned voice saved. Continue when ready.
+        </p>
       ) : null}
     </div>
   );

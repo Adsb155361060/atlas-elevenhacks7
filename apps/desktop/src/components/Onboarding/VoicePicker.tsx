@@ -40,19 +40,35 @@ export function VoicePicker() {
       }}
       secondary={{ label: 'Back', onClick: back }}
     >
-      <div role="tablist" className="flex gap-1 mb-5 border-b border-slate-800">
+      <div
+        role="tablist"
+        style={{
+          display: 'flex',
+          gap: 4,
+          marginBottom: 20,
+          borderBottom: '1px solid var(--hair-strong)',
+        }}
+      >
         {(['stock', 'record', 'upload'] as Tab[]).map((t) => (
           <button
             key={t}
             role="tab"
             aria-selected={tab === t}
             onClick={() => setTab(t)}
-            className={[
-              'px-3 py-2 text-xs uppercase tracking-wider transition-colors -mb-px border-b',
-              tab === t
-                ? 'text-emerald-400 border-emerald-500'
-                : 'text-slate-500 hover:text-slate-300 border-transparent',
-            ].join(' ')}
+            className="mono"
+            style={{
+              background: 'transparent',
+              border: 'none',
+              padding: '10px 16px',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              textTransform: 'uppercase',
+              color: tab === t ? 'var(--brass)' : 'var(--cream-mute)',
+              borderBottom: `1px solid ${tab === t ? 'var(--brass)' : 'transparent'}`,
+              marginBottom: -1,
+              cursor: 'pointer',
+              transition: 'color 180ms ease, border-color 180ms ease',
+            }}
           >
             {TAB_LABEL[t]}
           </button>

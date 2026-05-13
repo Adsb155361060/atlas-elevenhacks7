@@ -13,36 +13,86 @@ export function Sidebar() {
   const setView = useView((s) => s.setView);
 
   return (
-    <aside className="w-44 shrink-0 border-r border-slate-800/60 px-4 py-6">
+    <aside
+      style={{
+        width: 200,
+        flexShrink: 0,
+        borderRight: '1px solid var(--hair-strong)',
+        padding: '32px 24px',
+      }}
+    >
       <button
         type="button"
         onClick={() => setView('home')}
-        className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-200 mb-6 transition-colors"
+        className="mono"
+        style={{
+          background: 'transparent',
+          border: 'none',
+          color: 'var(--cream-mute)',
+          fontSize: 10,
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          cursor: 'pointer',
+          padding: 0,
+          marginBottom: 36,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--cream)')}
+        onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--cream-mute)')}
       >
         <span aria-hidden>←</span>
         <span>Back to Atlas</span>
       </button>
-      <h2 className="text-[10px] uppercase tracking-widest text-slate-500 mb-3">
+      <h2
+        className="mono"
+        style={{
+          fontSize: 10,
+          letterSpacing: '0.22em',
+          textTransform: 'uppercase',
+          color: 'var(--brass)',
+          marginBottom: 14,
+          margin: '0 0 14px',
+        }}
+      >
         Settings
       </h2>
       <nav>
-        <ul className="space-y-0.5">
-          {SECTIONS.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                onClick={() => setSettingsSection(s.id)}
-                className={[
-                  'w-full text-left px-2.5 py-1.5 rounded text-sm transition-colors',
-                  s.id === settingsSection
-                    ? 'bg-slate-800 text-slate-100'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900',
-                ].join(' ')}
-              >
-                {s.label}
-              </button>
-            </li>
-          ))}
+        <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {SECTIONS.map((s) => {
+            const active = s.id === settingsSection;
+            return (
+              <li key={s.id}>
+                <button
+                  type="button"
+                  onClick={() => setSettingsSection(s.id)}
+                  className="serif"
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '8px 10px',
+                    background: active ? 'rgba(201, 160, 79, 0.12)' : 'transparent',
+                    border: 'none',
+                    borderLeft: `2px solid ${active ? 'var(--brass)' : 'transparent'}`,
+                    color: active ? 'var(--cream)' : 'var(--cream-mute)',
+                    fontSize: 15,
+                    fontStyle: active ? 'italic' : 'normal',
+                    cursor: 'pointer',
+                    transition: 'all 180ms ease',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!active) e.currentTarget.style.color = 'var(--cream)';
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!active) e.currentTarget.style.color = 'var(--cream-mute)';
+                  }}
+                >
+                  {s.label}
+                </button>
+              </li>
+            );
+          })}
         </ul>
       </nav>
     </aside>

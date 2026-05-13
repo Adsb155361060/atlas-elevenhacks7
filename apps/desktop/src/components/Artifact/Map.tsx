@@ -44,9 +44,22 @@ export function MapArtifact({ data }: { data: unknown }) {
   }, []);
 
   return (
-    <div className="space-y-2">
-      {d.title ? <h3 className="text-sm font-medium text-slate-100">{d.title}</h3> : null}
-      <div className="rounded-md overflow-hidden border border-slate-800 h-[360px]">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {d.title ? (
+        <h3
+          className="serif"
+          style={{
+            margin: 0,
+            fontSize: 18,
+            fontStyle: 'italic',
+            color: 'var(--cream)',
+            fontVariationSettings: '"opsz" 36, "SOFT" 30',
+          }}
+        >
+          {d.title}
+        </h3>
+      ) : null}
+      <div style={{ overflow: 'hidden', border: '1px solid var(--hair-strong)', height: 360 }}>
         <MapContainer
           center={center}
           zoom={zoom}

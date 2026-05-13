@@ -10,23 +10,72 @@ export function TutorialArtifact({ data }: { data: unknown }) {
   const d = (data as TutorialData) ?? {};
   const steps = d.steps ?? [];
   if (steps.length === 0) {
-    return <p className="text-sm text-slate-500">No steps in tutorial.</p>;
+    return (
+      <p
+        className="mono"
+        style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--cream-faint)' }}
+      >
+        No steps in tutorial
+      </p>
+    );
   }
   return (
-    <div className="space-y-4">
-      {d.title ? <h3 className="text-base font-medium text-slate-100">{d.title}</h3> : null}
-      <ol className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+      {d.title ? (
+        <h3
+          className="serif"
+          style={{
+            margin: 0,
+            fontSize: 22,
+            fontStyle: 'italic',
+            color: 'var(--cream)',
+            fontVariationSettings: '"opsz" 36, "SOFT" 30',
+          }}
+        >
+          {d.title}
+        </h3>
+      ) : null}
+      <ol style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 18 }}>
         {steps.map((step, i) => (
-          <li key={i} className="flex gap-3">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-medium flex items-center justify-center">
-              {i + 1}
+          <li key={i} style={{ display: 'flex', gap: 14 }}>
+            <span
+              className="mono"
+              style={{
+                flexShrink: 0,
+                fontSize: 11,
+                letterSpacing: '0.18em',
+                color: 'var(--brass)',
+                paddingTop: 3,
+                width: 28,
+              }}
+            >
+              {String(i + 1).padStart(2, '0')}
             </span>
-            <div className="flex-1">
+            <div style={{ flex: 1 }}>
               {step.heading ? (
-                <h4 className="text-sm font-medium text-slate-100">{step.heading}</h4>
+                <h4
+                  className="serif"
+                  style={{
+                    margin: 0,
+                    fontSize: 15,
+                    fontStyle: 'italic',
+                    color: 'var(--cream)',
+                    fontVariationSettings: '"opsz" 36, "SOFT" 30',
+                  }}
+                >
+                  {step.heading}
+                </h4>
               ) : null}
               {step.body ? (
-                <div className="prose prose-invert prose-sm max-w-none mt-1 text-slate-300">
+                <div
+                  className="serif-body atlas-markdown"
+                  style={{
+                    marginTop: 6,
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    color: 'var(--cream-dim)',
+                  }}
+                >
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{step.body}</ReactMarkdown>
                 </div>
               ) : null}

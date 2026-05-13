@@ -14,25 +14,53 @@ export function ImageArtifact({ data }: { data: unknown }) {
   const src = d.url ?? d.src ?? d.data_uri ?? '';
   const [errored, setErrored] = useState(false);
   if (!src) {
-    return <p className="text-sm text-slate-500">No image source provided.</p>;
+    return (
+      <p
+        className="mono"
+        style={{ fontSize: 11, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--cream-faint)' }}
+      >
+        No image source provided
+      </p>
+    );
   }
   if (errored) {
     return (
-      <p className="text-sm text-rose-400">
-        Image failed to load. Source: <code className="text-xs">{src.slice(0, 80)}…</code>
+      <p
+        className="serif-body"
+        style={{ fontSize: 13, color: 'var(--signal-red)' }}
+      >
+        Image failed to load.{' '}
+        <code className="mono" style={{ fontSize: 11, color: 'var(--cream-mute)' }}>
+          {src.slice(0, 80)}…
+        </code>
       </p>
     );
   }
   return (
-    <figure className="space-y-2">
+    <figure style={{ margin: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
       <img
         src={src}
         alt={d.alt ?? d.caption ?? 'generated image'}
         onError={() => setErrored(true)}
-        className="rounded-md border border-slate-800 max-h-[480px] mx-auto"
+        style={{
+          border: '1px solid var(--hair-strong)',
+          maxHeight: 480,
+          margin: '0 auto',
+          display: 'block',
+        }}
       />
       {d.caption ? (
-        <figcaption className="text-xs text-slate-500 text-center">{d.caption}</figcaption>
+        <figcaption
+          className="serif-body"
+          style={{
+            fontSize: 12,
+            fontStyle: 'italic',
+            color: 'var(--cream-mute)',
+            textAlign: 'center',
+          }}
+        >
+          {d.caption}
+        </figcaption>
       ) : null}
     </figure>
   );

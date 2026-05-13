@@ -14,17 +14,43 @@ export function CodeArtifact({ data }: { data: unknown }) {
   const source = d.code ?? d.source ?? '';
   const language = (d.language ?? d.lang ?? 'plaintext').toLowerCase();
   return (
-    <div className="rounded-md overflow-hidden border border-slate-800">
+    <div style={{ overflow: 'hidden', border: '1px solid var(--hair-strong)' }}>
       {d.filename ? (
-        <div className="px-3 py-1.5 bg-slate-900/60 text-[11px] font-mono text-slate-400 border-b border-slate-800 flex items-center justify-between">
+        <div
+          className="mono"
+          style={{
+            padding: '8px 14px',
+            background: 'rgba(20, 17, 14, 0.85)',
+            fontSize: 11,
+            color: 'var(--cream-mute)',
+            borderBottom: '1px solid var(--hair-strong)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <span>{d.filename}</span>
-          <span className="uppercase tracking-widest text-[9px]">{language}</span>
+          <span
+            style={{
+              fontSize: 9,
+              letterSpacing: '0.22em',
+              textTransform: 'uppercase',
+              color: 'var(--brass)',
+            }}
+          >
+            {language}
+          </span>
         </div>
       ) : null}
       <SyntaxHighlighter
         language={language}
         style={oneDark}
-        customStyle={{ margin: 0, padding: '1rem', background: 'rgb(15 23 42 / 0.6)' }}
+        customStyle={{
+          margin: 0,
+          padding: '14px 16px',
+          background: 'rgba(20, 17, 14, 0.85)',
+          fontSize: 13,
+        }}
         wrapLongLines
       >
         {source}

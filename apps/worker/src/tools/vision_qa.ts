@@ -1,23 +1,21 @@
 /**
- * Vision QA — Claude reads an image and answers a question about it.
+ * Vision QA — Gemini reads an image and answers a question about it.
  *
- * The desktop captures the screen (or in the future, a webcam frame),
- * uploads it as multipart, and the Worker forwards it to Anthropic's
- * Messages API as an image content block.
+ * The desktop captures the screen (or a webcam frame), uploads it as
+ * multipart, and the Worker forwards it to Google Gemini's
+ * `generateContent` endpoint as an inlineData image part.
  *
- * Why on the Worker, not the desktop direct: keeps the Anthropic key off
- * the user's machine, gives us one place to add budget/limit/audit logic,
- * and matches the same auth pattern as our other cloud tools.
+ * Why on the Worker, not the desktop direct: keeps the Gemini key off the
+ * user's machine, gives us one place to add budget/limit/audit logic, and
+ * matches the same auth pattern as our other cloud tools.
  *
- * Anthropic vision reference:
- * https://docs.anthropic.com/en/docs/build-with-claude/vision
+ * Gemini vision reference:
+ * https://ai.google.dev/gemini-api/docs/vision
  */
 
-import Anthropic from '@anthropic-ai/sdk';
-import { getAnthropicClient } from '../claude/client.js';
 import type { Env } from '../env.js';
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — Anthropic's per-image cap; we enforce client-side too
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const SUPPORTED_MEDIA_TYPES = new Set<MediaType>([
   'image/png',
   'image/jpeg',
@@ -29,6 +27,13 @@ type MediaType = 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
 const SYSTEM_PROMPT =
   "You are the vision module of a voice-first assistant called Atlas. The user has shared a screenshot or photo and asked a question. Answer in one or two short, factual sentences suitable to be read aloud. Don't read URLs, hashes, or long strings — describe them by category instead. If you can't see anything relevant, say so plainly.";
 
+/** Same Gemini Flash family the chat path uses. Vision quality on 2.5 Flash
+ *  is plenty for one-shot Q&A and the latency is well within voice
+ *  expectations (~1s). */
+const VISION_MODEL = 'gemini-2.5-flash';
+
+// Public class name kept (and re-exported) for callers / tests. It's no
+// longer specifically about Anthropic but stable surface beats churn.
 export class VisionQAError extends Error {
   constructor(
     public status: number,
@@ -48,6 +53,15 @@ export interface VisionQAInput {
 export interface VisionQAResult {
   answer: string;
   model: string;
+}
+
+interface GeminiGenerateResponse {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> };
+    finishReason?: string;
+  }>;
+  modelVersion?: string;
+  error?: { message?: string; code?: number; status?: string };
 }
 
 export async function visionQA(env: Env, input: VisionQAInput): Promise<VisionQAResult> {
@@ -70,63 +84,82 @@ export async function visionQA(env: Env, input: VisionQAInput): Promise<VisionQA
       `media_type '${input.media_type}' not supported; use png/jpeg/gif/webp`,
     );
   }
-
-  const client = getAnthropicClient(env);
-  const base64 = bytesToBase64(input.image_bytes);
-
-  const params: Anthropic.Messages.MessageCreateParamsNonStreaming = {
-    model: env.DEFAULT_ANTHROPIC_MODEL,
-    max_tokens: 512,
-    temperature: 0.2,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'image',
-            source: {
-              type: 'base64',
-              media_type: media,
-              data: base64,
-            },
-          },
-          {
-            type: 'text',
-            text: input.question.trim(),
-          },
-        ],
-      },
-    ],
-  };
-
-  let message: Anthropic.Messages.Message;
-  try {
-    message = await client.messages.create(params);
-  } catch (err) {
-    const status = (err as { status?: number }).status ?? 502;
+  if (!env.GEMINI_API_KEY) {
     throw new VisionQAError(
-      status,
-      `anthropic vision ${status}: ${(err as Error).message}`,
+      500,
+      'GEMINI_API_KEY not configured on worker — wrangler secret put',
     );
   }
 
-  const text = message.content
-    .filter((b): b is Anthropic.Messages.TextBlock => b.type === 'text')
-    .map((b) => b.text)
+  const base64 = bytesToBase64(input.image_bytes);
+
+  // Non-streaming generateContent: vision Q&A is one short answer, no
+  // need for SSE plumbing.
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    VISION_MODEL,
+  )}:generateContent`;
+
+  const body = {
+    contents: [
+      {
+        role: 'user',
+        parts: [
+          { inlineData: { mimeType: media, data: base64 } },
+          { text: input.question.trim() },
+        ],
+      },
+    ],
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    generationConfig: {
+      temperature: 0.2,
+      // 2048 leaves headroom for Gemini's thinking-token budget so the
+      // visible answer doesn't get cut off by `finishReason: "length"`.
+      maxOutputTokens: 2048,
+    },
+  };
+
+  let resp: Response;
+  try {
+    resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': env.GEMINI_API_KEY,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    throw new VisionQAError(502, `gemini vision network: ${(err as Error).message}`);
+  }
+
+  if (!resp.ok) {
+    const errText = await resp.text().catch(() => '');
+    throw new VisionQAError(
+      resp.status,
+      `gemini vision ${resp.status}: ${errText.slice(0, 300)}`,
+    );
+  }
+
+  const parsed = (await resp.json()) as GeminiGenerateResponse;
+  if (parsed.error) {
+    throw new VisionQAError(502, `gemini vision: ${parsed.error.message ?? 'unknown'}`);
+  }
+
+  const text = (parsed.candidates ?? [])
+    .flatMap((c) => c.content?.parts ?? [])
+    .map((p) => p.text ?? '')
     .join('\n')
     .trim();
   if (!text) {
-    throw new VisionQAError(502, 'anthropic returned no text');
+    throw new VisionQAError(502, 'gemini returned no text');
   }
-  return { answer: text, model: message.model };
+  return { answer: text, model: parsed.modelVersion ?? VISION_MODEL };
 }
 
 // ───────────────────────── helpers ─────────────────────────
 
 function normaliseMediaType(input: string): MediaType {
   const lower = input.toLowerCase().trim();
-  // Strip optional charset suffix.
   const head = lower.split(';')[0]!.trim();
   if (head === 'image/jpg') return 'image/jpeg';
   return head as MediaType;

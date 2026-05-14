@@ -15,6 +15,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, SampleFormat, Stream, StreamConfig};
 use parking_lot::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
@@ -42,7 +43,15 @@ pub struct AgentCapture {
 }
 
 impl AgentCapture {
-    pub fn start(tx: UnboundedSender<ClientCommand>) -> Result<Self> {
+    /// Open the mic stream. While `mute_flag` is `true`, captured frames are
+    /// replaced with silence before being chunked + sent upstream. This is how
+    /// we implement half-duplex: when the agent is talking, ElevenLabs only
+    /// receives zero PCM from us, so its VAD can't false-trigger on the
+    /// agent's own voice bleeding through speakers / mic loopback / etc.
+    pub fn start(
+        tx: UnboundedSender<ClientCommand>,
+        mute_flag: Arc<AtomicBool>,
+    ) -> Result<Self> {
         let host = cpal::default_host();
         let device = pick_input_device(&host)?;
         let device_name = device.name().unwrap_or_else(|_| "unknown".into());
@@ -70,12 +79,13 @@ impl AgentCapture {
             SampleFormat::I16 => {
                 let acc = accumulator.clone();
                 let tx = tx.clone();
+                let muted = mute_flag.clone();
                 device.build_input_stream(
                     &config,
                     move |data: &[i16], _| {
                         let mono = mix_to_mono_i16(data, channels);
                         let down = decimate(&mono, downsample);
-                        accumulate(&acc, &down, &tx);
+                        accumulate(&acc, &down, &tx, &muted);
                     },
                     err_fn,
                     None,
@@ -84,12 +94,13 @@ impl AgentCapture {
             SampleFormat::F32 => {
                 let acc = accumulator.clone();
                 let tx = tx.clone();
+                let muted = mute_flag.clone();
                 device.build_input_stream(
                     &config,
                     move |data: &[f32], _| {
                         let mono = mix_to_mono_f32_as_i16(data, channels);
                         let down = decimate(&mono, downsample);
-                        accumulate(&acc, &down, &tx);
+                        accumulate(&acc, &down, &tx, &muted);
                     },
                     err_fn,
                     None,
@@ -98,13 +109,14 @@ impl AgentCapture {
             SampleFormat::U16 => {
                 let acc = accumulator.clone();
                 let tx = tx.clone();
+                let muted = mute_flag.clone();
                 device.build_input_stream(
                     &config,
                     move |data: &[u16], _| {
                         let i16_buf: Vec<i16> = data.iter().map(|&u| u16_to_i16(u)).collect();
                         let mono = mix_to_mono_i16(&i16_buf, channels);
                         let down = decimate(&mono, downsample);
-                        accumulate(&acc, &down, &tx);
+                        accumulate(&acc, &down, &tx, &muted);
                     },
                     err_fn,
                     None,
@@ -113,6 +125,7 @@ impl AgentCapture {
             SampleFormat::U8 => {
                 let acc = accumulator.clone();
                 let tx = tx.clone();
+                let muted = mute_flag.clone();
                 device.build_input_stream(
                     &config,
                     move |data: &[u8], _| {
@@ -121,7 +134,7 @@ impl AgentCapture {
                             data.iter().map(|&u| ((u as i16) - 128) << 8).collect();
                         let mono = mix_to_mono_i16(&i16_buf, channels);
                         let down = decimate(&mono, downsample);
-                        accumulate(&acc, &down, &tx);
+                        accumulate(&acc, &down, &tx, &muted);
                     },
                     err_fn,
                     None,
@@ -155,9 +168,24 @@ impl AgentCapture {
 /// and push a `ClientCommand::SendUserAudio` to the WebSocket task. Locks are
 /// held only for the time it takes to copy bytes — microseconds; cpal's
 /// callback thread is robust to that.
-fn accumulate(acc: &Arc<Mutex<Vec<i16>>>, chunk: &[i16], tx: &UnboundedSender<ClientCommand>) {
+fn accumulate(
+    acc: &Arc<Mutex<Vec<i16>>>,
+    chunk: &[i16],
+    tx: &UnboundedSender<ClientCommand>,
+    muted: &Arc<AtomicBool>,
+) {
     let mut buf = acc.lock();
-    buf.extend_from_slice(chunk);
+    if muted.load(Ordering::Relaxed) {
+        // Half-duplex: while the agent is playing audio, replace incoming
+        // mic samples with silence. The WebSocket stays alive (ElevenLabs
+        // expects continuous PCM) but its VAD sees zeros and can't false-
+        // trigger on the agent's own voice bleeding back through speaker
+        // → mic, PipeWire monitor sources, etc.
+        let new_len = buf.len() + chunk.len();
+        buf.resize(new_len, 0);
+    } else {
+        buf.extend_from_slice(chunk);
+    }
     while buf.len() >= SAMPLES_PER_CHUNK {
         let drained: Vec<i16> = buf.drain(..SAMPLES_PER_CHUNK).collect();
         // PCM16 little-endian → bytes
@@ -310,13 +338,14 @@ mod tests {
     fn accumulate_emits_chunk_at_boundary() {
         let (tx, mut rx) = unbounded_channel::<ClientCommand>();
         let acc: Arc<Mutex<Vec<i16>>> = Arc::new(Mutex::new(Vec::new()));
+        let muted = Arc::new(AtomicBool::new(false));
 
         // Push less than a chunk — nothing emitted.
-        accumulate(&acc, &vec![0_i16; 1000], &tx);
+        accumulate(&acc, &vec![123_i16; 1000], &tx, &muted);
         assert!(rx.try_recv().is_err());
 
         // Push enough to cross the boundary — one chunk emitted.
-        accumulate(&acc, &vec![0_i16; SAMPLES_PER_CHUNK], &tx);
+        accumulate(&acc, &vec![123_i16; SAMPLES_PER_CHUNK], &tx, &muted);
         let cmd = rx.try_recv().expect("chunk after boundary");
         match cmd {
             ClientCommand::SendUserAudio(b64) => {
@@ -328,6 +357,23 @@ mod tests {
         }
         // Residual: started with 1000, added 4000 = 5000, drained 4000 → 1000 left.
         assert_eq!(acc.lock().len(), 1000);
+    }
+
+    #[test]
+    fn accumulate_writes_silence_when_muted() {
+        let (tx, mut rx) = unbounded_channel::<ClientCommand>();
+        let acc: Arc<Mutex<Vec<i16>>> = Arc::new(Mutex::new(Vec::new()));
+        let muted = Arc::new(AtomicBool::new(true));
+
+        // Even loud samples become silence when muted.
+        accumulate(&acc, &vec![i16::MAX; SAMPLES_PER_CHUNK], &tx, &muted);
+        let cmd = rx.try_recv().expect("chunk after boundary");
+        if let ClientCommand::SendUserAudio(b64) = cmd {
+            let raw = base64::engine::general_purpose::STANDARD.decode(b64).unwrap();
+            assert!(raw.iter().all(|&b| b == 0), "muted chunk should be all zeros");
+        } else {
+            panic!("expected SendUserAudio");
+        }
     }
 
     #[test]

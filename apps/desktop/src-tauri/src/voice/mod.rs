@@ -275,27 +275,35 @@ async fn start_session<R: Runtime>(
     // on Linux ALSA, so we cannot hold the AgentCapture across an await on
     // tokio's multi-threaded runtime. The thread owns the stream for the
     // session and drops it (closing the device) when we signal shutdown.
+    // Half-duplex flag — flipped to true whenever the agent has audio
+    // queued for playback, flipped back to false a short grace period after
+    // the playback ring drains. Capture replaces mic frames with silence
+    // while it's true, so ElevenLabs's VAD can't hear the agent's own voice
+    // bleeding back through speakers / mic loopback / etc.
+    let mic_muted = Arc::new(AtomicBool::new(false));
+
     let (init_tx, init_rx) = tokio::sync::oneshot::channel::<Result<MicMeta>>();
     let (shutdown_tx, shutdown_rx) = std::sync::mpsc::channel::<()>();
     let capture_tx = tx.clone();
+    let capture_mute = mic_muted.clone();
     std::thread::Builder::new()
         .name("voice-mic".into())
-        .spawn(move || match capture::AgentCapture::start(capture_tx) {
-            Ok(cap) => {
-                let meta = MicMeta {
-                    device: cap.device_name().to_string(),
-                    sample_rate: cap.sample_rate(),
-                };
-                let _ = init_tx.send(Ok(meta));
-                // Block until the orchestrator signals end-of-session (or the
-                // sender drops, indicating panic).
-                let _ = shutdown_rx.recv();
-                drop(cap); // closes the audio device cleanly
-            }
-            Err(err) => {
-                let _ = init_tx.send(Err(err));
-            }
-        })
+        .spawn(
+            move || match capture::AgentCapture::start(capture_tx, capture_mute) {
+                Ok(cap) => {
+                    let meta = MicMeta {
+                        device: cap.device_name().to_string(),
+                        sample_rate: cap.sample_rate(),
+                    };
+                    let _ = init_tx.send(Ok(meta));
+                    let _ = shutdown_rx.recv();
+                    drop(cap);
+                }
+                Err(err) => {
+                    let _ = init_tx.send(Err(err));
+                }
+            },
+        )
         .context("spawn voice-mic thread")?;
 
     match init_rx.await {
@@ -353,11 +361,51 @@ async fn start_session<R: Runtime>(
         }
     });
 
+    // Half-duplex watcher: poll the playback ring buffer; whenever it has
+    // queued samples, mark the mic muted. When the ring stays empty for a
+    // short grace tail, unmute. This is what stops the agent's own voice
+    // (bleeding through speakers, PipeWire monitor sources, etc.) from
+    // false-triggering ElevenLabs's VAD and cutting the agent off mid-word.
+    let (mute_cancel_tx, mut mute_cancel_rx) = tokio::sync::oneshot::channel::<()>();
+    let mute_flag = mic_muted.clone();
+    let mute_playback = playback.clone();
+    tokio::spawn(async move {
+        // Poll period — short enough that we mute promptly when audio
+        // starts (otherwise the first ~poll worth of agent voice would be
+        // streamed back upstream).
+        let poll = Duration::from_millis(40);
+        // Grace tail — how long the ring must stay empty before we unmute.
+        // 300ms catches the cpal output buffer that's still being drained
+        // past the ring, plus a hair for round-trip latency.
+        let grace = Duration::from_millis(300);
+        let mut empty_since: Option<Instant> = None;
+        loop {
+            let pending = mute_playback.pending_samples();
+            if pending > 0 {
+                if !mute_flag.swap(true, Ordering::Relaxed) {
+                    log::debug!("voice/halfduplex: mic MUTED (playback active)");
+                }
+                empty_since = None;
+            } else if let Some(t) = empty_since {
+                if t.elapsed() >= grace && mute_flag.swap(false, Ordering::Relaxed) {
+                    log::debug!("voice/halfduplex: mic UNMUTED (playback drained)");
+                }
+            } else {
+                empty_since = Some(Instant::now());
+            }
+            tokio::select! {
+                _ = tokio::time::sleep(poll) => {}
+                _ = &mut mute_cancel_rx => return,
+            }
+        }
+    });
+
     let result = client::run(config, callbacks, playback, rx, tx).await;
 
-    // Session loop is done — stop the inactivity watcher promptly so it
-    // doesn't survive across to the next wake.
+    // Session loop is done — stop the watchers so they don't survive across
+    // to the next wake.
     let _ = watcher_cancel_tx.send(());
+    let _ = mute_cancel_tx.send(());
 
     // Tell the mic thread to release the audio device.
     let _ = shutdown_tx.send(());

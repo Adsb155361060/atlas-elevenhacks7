@@ -50,12 +50,22 @@ pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult
         Err(_) => return ToolResult::err("vision_qa: no tokio runtime available".to_string()),
     };
 
+    // `execute` runs synchronously on a Tokio runtime worker (Tauri's
+    // async_runtime::spawn → tool dispatch). A naked `handle.block_on(...)`
+    // from inside an active runtime panics with:
+    //   "Cannot start a runtime from within a runtime"
+    // because Tokio refuses to let a worker block on another runtime call.
+    //
+    // `block_in_place` tells Tokio to relocate the worker's pending tasks
+    // onto other threads first, freeing the current thread to actually
+    // block. After that, `block_on` is legal. block_in_place itself
+    // requires a multi-threaded runtime, which Tauri uses by default.
     let png = match source {
         "screen" => match capture_screen() {
             Ok(b) => b,
             Err(err) => return ToolResult::err(format!("vision_qa: capture screen: {err:#}")),
         },
-        "camera" => match handle.block_on(capture_camera(app)) {
+        "camera" => match tokio::task::block_in_place(|| handle.block_on(capture_camera(app))) {
             Ok(b) => b,
             Err(err) => return ToolResult::err(format!("vision_qa: capture camera: {err:#}")),
         },
@@ -72,7 +82,7 @@ pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult
     );
 
     let question = input.question.clone();
-    match handle.block_on(upload_and_answer(question, png)) {
+    match tokio::task::block_in_place(|| handle.block_on(upload_and_answer(question, png))) {
         Ok(answer) => ToolResult::ok(json!({ "answer": answer, "source": source })),
         Err(err) => ToolResult::err(format!("vision_qa: {err:#}")),
     }

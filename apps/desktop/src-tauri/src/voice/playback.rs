@@ -74,8 +74,8 @@ impl PlaybackHandle {
         self.output_sample_rate
     }
 
-    /// Approximate samples currently queued. For diagnostics only.
-    #[allow(dead_code)]
+    /// Samples currently queued for playback. The half-duplex watcher in
+    /// `voice/mod.rs` polls this to decide when to mute / unmute the mic.
     pub fn pending_samples(&self) -> usize {
         self.ring.lock().len()
     }

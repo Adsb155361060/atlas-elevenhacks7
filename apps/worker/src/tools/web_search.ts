@@ -1,15 +1,15 @@
 /**
  * Firecrawl `/v1/search` proxy. Translates `{query, count?}` to Firecrawl's
- * search endpoint (which both *searches* and *scrapes* the top N hits in one
- * call) and normalises the response to our internal shape:
+ * search endpoint and normalises the response to our internal shape:
  *   `{results: [{title, url, snippet}]}`.
  *
- * Why Firecrawl over a plain search API:
- *   • One round-trip gets us both the SERP and the cleaned-up page content
- *     for each result (we'd otherwise have to do search → fetch each → strip).
- *   • Snippets become real summarisable chunks of the article rather than
- *     two-line SERP descriptions, which gives the agent meaningfully better
- *     context to ground its answer in.
+ * SERP-only — no `scrapeOptions`. We originally asked Firecrawl to *scrape*
+ * the top N pages too (richer article-body snippets), but that costs 1 + N
+ * credits per call and scrapes N pages serially, so a voice session that
+ * runs a few searches blew straight through Firecrawl's rate limit and the
+ * agent got HTTP 429 ("unable to fetch the news right now"). Plain search is
+ * 1 credit, returns in well under a second, and the SERP title+description
+ * is plenty for a spoken summary.
  *
  * Reference: https://docs.firecrawl.dev/api-reference/endpoint/search
  */
@@ -91,7 +91,6 @@ export async function webSearch(
     body: JSON.stringify({
       query: input.query.trim(),
       limit,
-      scrapeOptions: { formats: ['markdown'] },
     }),
   });
 

@@ -195,10 +195,81 @@ pub fn discover_apps() -> Vec<AppEntry> {
 
 #[cfg(target_os = "windows")]
 pub fn discover_apps() -> Vec<AppEntry> {
-    // Lightweight: rely on `start` resolving Start-menu shortcuts by name.
-    // A full implementation reads %APPDATA%\Microsoft\Windows\Start Menu —
-    // Phase 1.2 punts to that.
-    Vec::new()
+    // Walk the Start Menu shortcut trees — the all-users tree under
+    // %PROGRAMDATA% and the per-user tree under %APPDATA%. Every installed
+    // GUI app drops a `.lnk` there (Outlook, Chrome, Spotify, …); the file
+    // stem is the display name and `cmd /c start "" "<lnk path>"` launches
+    // it (Windows resolves the shortcut to its real target).
+    //
+    // The previous stub returned an empty Vec, so `best_match` always failed
+    // with "scanned 0 entries" and *no* app could ever be opened on Windows.
+    let mut roots: Vec<PathBuf> = Vec::new();
+    if let Some(pd) = std::env::var_os("PROGRAMDATA") {
+        roots.push(Path::new(&pd).join(r"Microsoft\Windows\Start Menu\Programs"));
+    }
+    if let Some(ad) = std::env::var_os("APPDATA") {
+        roots.push(Path::new(&ad).join(r"Microsoft\Windows\Start Menu\Programs"));
+    }
+
+    let mut entries = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for root in roots {
+        collect_lnks(&root, 0, &mut entries, &mut seen);
+    }
+    entries
+}
+
+/// Recursively collect `.lnk` shortcuts under a Start Menu directory. Bounded
+/// depth — Start Menu folders are shallow (`Programs/Microsoft Office/…`),
+/// 5 levels is plenty and stops a symlink loop from running away.
+#[cfg(target_os = "windows")]
+fn collect_lnks(
+    dir: &Path,
+    depth: usize,
+    entries: &mut Vec<AppEntry>,
+    seen: &mut std::collections::HashSet<String>,
+) {
+    if depth > 5 {
+        return;
+    }
+    let Ok(read) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for dent in read.flatten() {
+        let path = dent.path();
+        if path.is_dir() {
+            collect_lnks(&path, depth + 1, entries, seen);
+            continue;
+        }
+        let is_lnk = path
+            .extension()
+            .and_then(|e| e.to_str())
+            .map(|e| e.eq_ignore_ascii_case("lnk"))
+            == Some(true);
+        if !is_lnk {
+            continue;
+        }
+        let Some(name) = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .map(|s| s.to_string())
+        else {
+            continue;
+        };
+        // Drop installer/uninstaller noise so it can't out-rank the real app.
+        let lname = name.to_ascii_lowercase();
+        if lname.contains("uninstall") {
+            continue;
+        }
+        if !seen.insert(lname) {
+            continue; // all-users tree wins over per-user duplicates
+        }
+        entries.push(AppEntry {
+            id: name.clone(),
+            name,
+            exec: path.to_string_lossy().to_string(),
+        });
+    }
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]

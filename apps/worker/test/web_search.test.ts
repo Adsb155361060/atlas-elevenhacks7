@@ -19,8 +19,9 @@ describe('webSearch (Firecrawl backend)', () => {
       expect(body).toMatchObject({
         query: 'lagos population',
         limit: 5,
-        scrapeOptions: { formats: ['markdown'] },
       });
+      // SERP-only — no scrapeOptions (it caused Firecrawl rate-limit 429s).
+      expect(body.scrapeOptions).toBeUndefined();
       return jsonResponse({
         success: true,
         data: [

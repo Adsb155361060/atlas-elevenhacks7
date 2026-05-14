@@ -44,6 +44,35 @@ pub fn app_version() -> String {
     env!("CARGO_PKG_VERSION").to_string()
 }
 
+/// Read the tail of the active log file so the frontend's "Copy diagnostics"
+/// button can ship a self-contained bug report to clipboard. We deliberately
+/// cap the returned size — log files can be large after a long-running
+/// session and we don't want to OOM the WebView when the user clicks.
+#[tauri::command]
+pub fn copy_diagnostics<R: Runtime>(app: AppHandle<R>, lines: Option<usize>) -> Result<String, String> {
+    use std::fs;
+    use std::path::PathBuf;
+    let max_lines = lines.unwrap_or(120).min(2000);
+    let log_dir: PathBuf = app
+        .path()
+        .app_log_dir()
+        .map_err(|e| format!("could not resolve log dir: {e}"))?;
+    // tauri-plugin-log writes "atlas.log" (current) plus rotated siblings.
+    let primary = log_dir.join("atlas.log");
+    if !primary.exists() {
+        return Err(format!("no log file at {}", primary.display()));
+    }
+    let content = fs::read_to_string(&primary)
+        .map_err(|e| format!("read {} failed: {e}", primary.display()))?;
+    let tail: Vec<&str> = content.lines().rev().take(max_lines).collect();
+    let mut out = String::new();
+    for line in tail.into_iter().rev() {
+        out.push_str(line);
+        out.push('\n');
+    }
+    Ok(out)
+}
+
 /// Open the OS-level microphone privacy settings page. On Windows that
 /// deep-links into the Privacy → Microphone settings; on macOS, the
 /// Security & Privacy → Microphone pane. Linux falls back to logging a
@@ -109,9 +138,10 @@ pub fn settings_reset_all_data<R: Runtime>(app: AppHandle<R>) -> Result<(), Stri
 }
 
 /// Debug-only: simulate the wake event so the rest of the voice loop can be
-/// exercised before a wakeword model is configured. Wired in `lib.rs` only
-/// when `debug_assertions` is on, so it's stripped from release builds.
-#[cfg(debug_assertions)]
+/// Manually fire a wake event. Originally a debug-only helper, but it's also
+/// the fallback path on platforms where global hotkeys can't be intercepted
+/// (e.g. Wayland compositors that block XGrabKey) — the cockpit click-handler
+/// invokes this so users can wake Atlas by tapping the orb / window.
 #[tauri::command]
 pub fn fire_wake_test<R: Runtime>(app: AppHandle<R>) {
     crate::wake::fire_wake_externally(&app);

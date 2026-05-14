@@ -123,6 +123,7 @@ fn run_inner() -> Result<()> {
             commands::quit_app,
             commands::app_version,
             commands::open_mic_settings,
+            commands::copy_diagnostics,
             commands::voice_prefs_get,
             commands::voice_prefs_set,
             commands::voice_prefs_reset,
@@ -134,7 +135,6 @@ fn run_inner() -> Result<()> {
             commands::vision_camera_deliver,
             commands::app_info,
             commands::settings_reset_all_data,
-            #[cfg(debug_assertions)]
             commands::fire_wake_test,
             #[cfg(debug_assertions)]
             commands::send_user_message_test,

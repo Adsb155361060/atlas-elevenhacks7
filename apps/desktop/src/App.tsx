@@ -32,6 +32,7 @@ import { subscribeToArtifacts } from './ipc/artifact';
 import { subscribeToCameraCaptures } from './ipc/camera';
 import { subscribeToToolStatus } from './ipc/toolStatus';
 import { requestMicrophonePermission } from './ipc/mic';
+import { copyDiagnosticsToClipboard } from './ipc/diagnostics';
 import { HUD } from './components/HUD';
 import { OrbStage } from './components/OrbStage';
 import { CaptionRail } from './components/CaptionRail';
@@ -288,11 +289,64 @@ export function App() {
         <SettingsGearIcon />
       </button>
 
+      <DiagnosticsButton state={state} />
+
       <TimerStack />
       <ToolBadge />
       <ErrorToast />
       <FirstRunTutorial />
     </main>
+  );
+}
+
+function DiagnosticsButton({ state }: { state: string }) {
+  const entries = useTranscripts((s) => s.entries);
+  const pushError = useToolStatus((s) => s.pushError);
+  const [copied, setCopied] = useState(false);
+
+  const onClick = async () => {
+    const lastUser = [...entries].reverse().find((e) => e.role === 'user')?.text;
+    const lastAgent = [...entries].reverse().find((e) => e.role === 'agent')?.text;
+    try {
+      await copyDiagnosticsToClipboard({ state, lastUser, lastAgent });
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2200);
+    } catch (err) {
+      pushError('diagnostics', `Could not copy diagnostics: ${String(err)}`);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Copy diagnostics to clipboard"
+      title="Copy a log + state snapshot to the clipboard for bug reports"
+      data-no-wake
+      className="mono"
+      style={{
+        position: 'absolute',
+        top: 36,
+        right: 280,
+        height: 28,
+        padding: '0 12px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        background: copied ? 'rgba(143, 174, 159, 0.18)' : 'transparent',
+        border: `1px solid ${copied ? 'var(--sage)' : 'var(--hair-strong)'}`,
+        borderRadius: 2,
+        color: copied ? 'var(--sage)' : 'var(--cream-mute)',
+        fontSize: 10,
+        letterSpacing: '0.18em',
+        textTransform: 'uppercase',
+        cursor: 'pointer',
+        zIndex: 20,
+        transition: 'all 180ms ease',
+      }}
+    >
+      {copied ? '✓ Copied' : 'Copy diag'}
+    </button>
   );
 }
 

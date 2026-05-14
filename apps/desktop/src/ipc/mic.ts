@@ -19,6 +19,20 @@ export async function requestMicrophonePermission(): Promise<MicPermissionResult
   if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
     return { ok: false, reason: 'WebView does not expose getUserMedia', denied: false };
   }
+
+  // The probe is only meaningful on platforms that gate mic access per-app:
+  //   • Windows — "Let desktop apps access your microphone" Settings toggle
+  //   • macOS   — TCC / NSMicrophoneUsageDescription system prompt
+  // On Linux the mic is opened directly by cpal through ALSA/PulseAudio and
+  // there's no per-app gate; getUserMedia inside the embedded WebKit2GTK
+  // webview reliably returns NotAllowedError even when the OS-level mic is
+  // perfectly accessible to the binary. Skip the probe there.
+  const ua = navigator.userAgent ?? '';
+  const needsProbe = /Macintosh|Mac OS X/.test(ua) || /Windows/.test(ua);
+  if (!needsProbe) {
+    return { ok: true };
+  }
+
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     stream.getTracks().forEach((t) => t.stop());

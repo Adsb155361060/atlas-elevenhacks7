@@ -110,6 +110,23 @@ impl AgentCapture {
                     None,
                 )
             }
+            SampleFormat::U8 => {
+                let acc = accumulator.clone();
+                let tx = tx.clone();
+                device.build_input_stream(
+                    &config,
+                    move |data: &[u8], _| {
+                        // u8 PCM: silence is 128, range 0..255 → recentre + scale to i16.
+                        let i16_buf: Vec<i16> =
+                            data.iter().map(|&u| ((u as i16) - 128) << 8).collect();
+                        let mono = mix_to_mono_i16(&i16_buf, channels);
+                        let down = decimate(&mono, downsample);
+                        accumulate(&acc, &down, &tx);
+                    },
+                    err_fn,
+                    None,
+                )
+            }
             other => return Err(anyhow!("unsupported sample format: {other:?}")),
         }
         .context("build_input_stream")?;
@@ -204,16 +221,30 @@ fn pick_input_device(host: &cpal::Host) -> Result<Device> {
 // ───────────────────────── config selection ─────────────────────────
 
 fn pick_input_config(device: &Device) -> Result<(StreamConfig, SampleFormat)> {
+    fn format_score(f: SampleFormat) -> u8 {
+        match f {
+            SampleFormat::I16 => 4,
+            SampleFormat::F32 => 3,
+            SampleFormat::U16 => 2,
+            SampleFormat::U8 => 1,
+            _ => 0,
+        }
+    }
     if let Ok(supported) = device.supported_input_configs() {
         let supported: Vec<_> = supported.collect();
-        for sc in &supported {
-            if sc.channels() == 1
-                && sc.min_sample_rate().0 <= TARGET_SAMPLE_RATE
-                && sc.max_sample_rate().0 >= TARGET_SAMPLE_RATE
-            {
-                let chosen = sc.with_sample_rate(cpal::SampleRate(TARGET_SAMPLE_RATE));
-                return Ok((chosen.config(), chosen.sample_format()));
-            }
+        let candidate = supported
+            .iter()
+            .filter(|sc| {
+                sc.min_sample_rate().0 <= TARGET_SAMPLE_RATE
+                    && sc.max_sample_rate().0 >= TARGET_SAMPLE_RATE
+            })
+            .max_by_key(|sc| {
+                let mono_bonus = if sc.channels() == 1 { 10 } else { 0 };
+                mono_bonus + format_score(sc.sample_format()) as i32
+            });
+        if let Some(sc) = candidate {
+            let chosen = sc.with_sample_rate(cpal::SampleRate(TARGET_SAMPLE_RATE));
+            return Ok((chosen.config(), chosen.sample_format()));
         }
     }
     let default = device

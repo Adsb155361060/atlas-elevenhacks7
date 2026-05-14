@@ -133,6 +133,24 @@ impl Playback {
                     None,
                 )
             }
+            SampleFormat::U16 => {
+                let ring = ring.clone();
+                device.build_output_stream(
+                    &config,
+                    move |data: &mut [u16], _| fill_u16(data, channels, &ring),
+                    err_fn,
+                    None,
+                )
+            }
+            SampleFormat::U8 => {
+                let ring = ring.clone();
+                device.build_output_stream(
+                    &config,
+                    move |data: &mut [u8], _| fill_u8(data, channels, &ring),
+                    err_fn,
+                    None,
+                )
+            }
             other => return Err(anyhow!("unsupported output sample format: {other:?}")),
         }
         .context("build_output_stream")?;
@@ -192,30 +210,73 @@ fn fill_f32(data: &mut [f32], channels: usize, ring: &Arc<Mutex<VecDeque<i16>>>)
     }
 }
 
+fn fill_u16(data: &mut [u16], channels: usize, ring: &Arc<Mutex<VecDeque<i16>>>) {
+    // u16 PCM is unsigned: 0..65535 with silence at 32768. Map i16 → u16 by
+    // adding 32768 (offset binary representation).
+    let frames = data.len() / channels.max(1);
+    let mut ring = ring.lock();
+    for f in 0..frames {
+        let s_i16 = ring.pop_front().unwrap_or(0);
+        let s_u16 = ((s_i16 as i32) + 32_768) as u16;
+        for c in 0..channels {
+            data[f * channels + c] = s_u16;
+        }
+    }
+    for s in data.iter_mut().skip(frames * channels) {
+        *s = 32_768;
+    }
+}
+
+fn fill_u8(data: &mut [u8], channels: usize, ring: &Arc<Mutex<VecDeque<i16>>>) {
+    // u8 PCM is unsigned 0..255 with silence at 128. Map i16 → u8 by
+    // right-shifting 8 bits and adding 128.
+    let frames = data.len() / channels.max(1);
+    let mut ring = ring.lock();
+    for f in 0..frames {
+        let s_i16 = ring.pop_front().unwrap_or(0);
+        // (i16 + 32768) >> 8  →  0..255
+        let s_u8 = (((s_i16 as i32) + 32_768) >> 8) as u8;
+        for c in 0..channels {
+            data[f * channels + c] = s_u8;
+        }
+    }
+    for s in data.iter_mut().skip(frames * channels) {
+        *s = 128;
+    }
+}
+
 // ───────────────────────── config selection ─────────────────────────
 
 fn pick_output_config(device: &Device, desired_rate: u32) -> Result<(StreamConfig, SampleFormat)> {
+    // Score sample formats so we *prefer* lossless integer paths: i16 matches
+    // our internal pipeline 1:1, f32 is a clean float widen, u16/u8 work but
+    // are the fallback. Without this ordering Linux PulseAudio/ALSA "default"
+    // devices on some boxes report u8 first and we used to error out.
+    fn format_score(f: SampleFormat) -> u8 {
+        match f {
+            SampleFormat::I16 => 4,
+            SampleFormat::F32 => 3,
+            SampleFormat::U16 => 2,
+            SampleFormat::U8 => 1,
+            _ => 0,
+        }
+    }
+
     if let Ok(supported) = device.supported_output_configs() {
         let supported: Vec<_> = supported.collect();
-        // Prefer mono at the desired rate.
-        for sc in &supported {
-            if sc.channels() == 1
-                && sc.min_sample_rate().0 <= desired_rate
-                && sc.max_sample_rate().0 >= desired_rate
-            {
-                let chosen = sc.with_sample_rate(cpal::SampleRate(desired_rate));
-                return Ok((chosen.config(), chosen.sample_format()));
-            }
-        }
-        // Stereo at the desired rate.
-        for sc in &supported {
-            if sc.channels() >= 2
-                && sc.min_sample_rate().0 <= desired_rate
-                && sc.max_sample_rate().0 >= desired_rate
-            {
-                let chosen = sc.with_sample_rate(cpal::SampleRate(desired_rate));
-                return Ok((chosen.config(), chosen.sample_format()));
-            }
+        // (channels-preference, format-score) — lower channels first, then best format.
+        let candidate = supported
+            .iter()
+            .filter(|sc| {
+                sc.min_sample_rate().0 <= desired_rate && sc.max_sample_rate().0 >= desired_rate
+            })
+            .max_by_key(|sc| {
+                let mono_bonus = if sc.channels() == 1 { 10 } else { 0 };
+                mono_bonus + format_score(sc.sample_format()) as i32
+            });
+        if let Some(sc) = candidate {
+            let chosen = sc.with_sample_rate(cpal::SampleRate(desired_rate));
+            return Ok((chosen.config(), chosen.sample_format()));
         }
     }
     // Fall back to device default — the cpal callback will simply consume the

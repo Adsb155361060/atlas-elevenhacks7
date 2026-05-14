@@ -85,7 +85,7 @@ describe('webSearch (Firecrawl backend)', () => {
       });
     const result = await webSearch('k', { query: 'x' }, fetcher);
     const snippet = result.results[0]?.snippet ?? '';
-    expect(snippet.length).toBeLessThanOrEqual(1501); // 1500 + ellipsis char
+    expect(snippet.length).toBeLessThanOrEqual(601); // 600 + ellipsis char
     expect(snippet.endsWith('…')).toBe(true);
   });
 

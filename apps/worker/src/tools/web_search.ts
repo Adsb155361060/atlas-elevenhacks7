@@ -18,8 +18,11 @@ const FIRECRAWL_SEARCH_ENDPOINT = 'https://api.firecrawl.dev/v1/search';
 
 /** How much of each scraped page we feed back to the agent. Firecrawl can
  *  return tens of kilobytes per result; the conversational LLM doesn't need
- *  that much, and a long prompt hurts latency for a voice loop. */
-const SNIPPET_MAX_CHARS = 1500;
+ *  that much, and a long prompt hurts latency for a voice loop. 600 chars
+ *  is roughly a tight paragraph — enough for grounded answers without
+ *  pushing the post-tool LLM call past ElevenLabs's orchestrator timeout
+ *  on top of however many tool calls Gemini decides to chain. */
+const SNIPPET_MAX_CHARS = 600;
 
 interface FirecrawlSearchResult {
   title?: string;

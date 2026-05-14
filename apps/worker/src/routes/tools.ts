@@ -48,12 +48,15 @@ const WebSearchBody = z.object({
 });
 
 tools.post('/web_search', async (c) => {
-  if (!c.env.BRAVE_SEARCH_API_KEY) {
+  // Prefer Firecrawl (current backend). BRAVE_SEARCH_API_KEY stays read for
+  // back-compat but isn't required.
+  const searchKey = c.env.FIRECRAWL_API_KEY ?? c.env.BRAVE_SEARCH_API_KEY;
+  if (!searchKey) {
     return c.json(
       {
         error: {
           message:
-            'BRAVE_SEARCH_API_KEY not configured on the worker — wrangler secret put',
+            'FIRECRAWL_API_KEY not configured on the worker — wrangler secret put',
           type: 'configuration_error',
         },
       },
@@ -74,11 +77,11 @@ tools.post('/web_search', async (c) => {
     );
   }
   try {
-    const result = await webSearch(c.env.BRAVE_SEARCH_API_KEY, parsed);
+    const result = await webSearch(searchKey, parsed);
     return c.json(result, 200);
   } catch (err) {
     if (err instanceof BraveSearchError) {
-      // 4xx from Brave we surface as 4xx; 5xx as 502 (upstream failure).
+      // 4xx from upstream we surface as 4xx; 5xx as 502.
       const status: 400 | 401 | 403 | 429 | 502 =
         err.status === 401 || err.status === 403
           ? 401
@@ -92,7 +95,7 @@ tools.post('/web_search', async (c) => {
           error: {
             message: err.message,
             type: 'upstream_error',
-            code: `brave_${err.status}`,
+            code: `search_${err.status}`,
           },
         },
         status,

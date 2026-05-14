@@ -26,6 +26,11 @@ export const EnvSchema = z.object({
   ),
   ELEVENLABS_API_KEY: z.string().optional(),
   VOYAGE_API_KEY: z.string().optional(),
+  FIRECRAWL_API_KEY: z.string().optional().describe(
+    'Firecrawl bearer token. Backs the web_search tool — Firecrawl does search + scrape in one call so the agent gets cleaned article markdown, not bare SERP snippets.',
+  ),
+  // Kept optional for back-compat; the legacy web_search route used it. Safe
+  // to drop entirely once we're sure nothing else references it.
   BRAVE_SEARCH_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
 

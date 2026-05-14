@@ -22,12 +22,17 @@ import { VisionQAError, visionQA } from '../tools/vision_qa.js';
 
 export const tools = new Hono<{ Bindings: Env }>();
 
-// Bearer auth gate — same as chat-completions/voices.
+// Bearer auth gate. ElevenLabs's custom-LLM dispatcher prepends "Bearer " to
+// the configured secret automatically (OpenAI Python SDK does it), but the
+// tool dispatcher sends `request_headers.Authorization` verbatim. The same
+// `ATLAS_WORKER_BEARER` secret feeds both, so we have to accept the token
+// either bare or with the prefix — there's no single secret-value that
+// satisfies both wire formats.
 tools.use('*', async (c, next) => {
   const auth = c.req.header('authorization') ?? '';
   const token = auth.toLowerCase().startsWith('bearer ')
     ? auth.slice(7).trim()
-    : '';
+    : auth.trim();
   if (!token || !allowedTokens(c.env).has(token)) {
     return c.json(
       {

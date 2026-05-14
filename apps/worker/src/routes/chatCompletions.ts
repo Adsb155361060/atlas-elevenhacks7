@@ -30,10 +30,14 @@ export const chatCompletions = new Hono<{ Bindings: Env }>();
 
 chatCompletions.post('/', async (c) => {
   // ─── 1. Auth ───
+  // Accept the token bare or prefixed with "Bearer ". The same shared secret
+  // gets sent verbatim by ElevenLabs's tool dispatcher (no auto-prefix) but
+  // wrapped with "Bearer " by its custom-LLM dispatcher (OpenAI SDK adds it),
+  // and we don't want to maintain two secrets.
   const auth = c.req.header('authorization') ?? '';
   const token = auth.toLowerCase().startsWith('bearer ')
     ? auth.slice(7).trim()
-    : '';
+    : auth.trim();
   if (!token || !allowedTokens(c.env).has(token)) {
     return c.json(
       {

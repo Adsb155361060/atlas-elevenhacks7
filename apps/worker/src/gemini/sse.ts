@@ -77,7 +77,15 @@ export async function* geminiStreamToOpenAIChunks(
 
   // Emit a final empty-delta chunk with the finish reason. ElevenLabs expects
   // this to know the turn ended.
-  yield buildChunk(meta, {}, mapFinishReason(finishReason));
+  //
+  // Gemini quirk: when its only output for the turn is a `functionCall`, it
+  // *still* sets `finishReason: "STOP"`. The OpenAI contract is that any turn
+  // ending in tool calls must report `finish_reason: "tool_calls"`. If we
+  // forward STOP → "stop" verbatim, downstream consumers (ElevenLabs Conv-AI)
+  // see "stop with no content" and bail with custom_llm_error. Override here.
+  const finalReason: OpenAIChunk['choices'][number]['finish_reason'] =
+    toolCallIndex > 0 ? 'tool_calls' : mapFinishReason(finishReason);
+  yield buildChunk(meta, {}, finalReason);
 }
 
 /**

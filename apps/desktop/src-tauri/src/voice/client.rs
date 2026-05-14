@@ -408,12 +408,14 @@ async fn fetch_signed_url(
         signed_url: String,
     }
     let parsed: SignedUrlResponse = resp.json().await.context("parse signed_url response")?;
-    let mut signed = url::Url::parse(&parsed.signed_url).context("parse signed url")?;
-    // Append source/version like the Python SDK does so analytics flow.
-    signed
-        .query_pairs_mut()
-        .append_pair("source", SOURCE_NAME)
-        .append_pair("version", SOURCE_VERSION);
+    let signed = url::Url::parse(&parsed.signed_url).context("parse signed url")?;
+    // IMPORTANT: do NOT append additional query params (source, version, …)
+    // to the signed URL. ElevenLabs signs the whole URL; any extra params
+    // appended after we receive it invalidate the signature and the WebSocket
+    // handshake comes back as 403 Forbidden. (Verified against ElevenLabs
+    // 2026-05 — both `wscat` and a Python websockets test confirm: bare
+    // signed URL connects, signed + source/version returns 403.)
+    // Source/version analytics flow through the init event payload instead.
     Ok(signed)
 }
 

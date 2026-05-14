@@ -228,14 +228,13 @@ fn dispatch_event(
                 meta.agent_output_audio_format,
                 meta.user_input_audio_format
             );
-            // Warn-but-don't-fail if the agent's output format doesn't match
-            // what `playback` is configured for. Resampling lives in a
-            // follow-up; for V1 we expect the agent to be set to pcm_16000
-            // (matches our microphone capture and Python SDK default).
+            // If the agent's output rate differs from the cpal device rate,
+            // `playback` resamples each chunk on push (see playback.rs). Just
+            // log it at info — no longer a correctness problem.
             if let Ok(rate) = playback::parse_pcm_format(&meta.agent_output_audio_format) {
                 if rate != playback.output_sample_rate() {
-                    log::warn!(
-                        "voice/client: agent output {rate}Hz != playback stream {}Hz — audio may pitch-shift; restart with matching rate or implement resampling.",
+                    log::info!(
+                        "voice/client: agent output {rate}Hz, playback device {}Hz — resampling on push",
                         playback.output_sample_rate()
                     );
                 }

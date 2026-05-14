@@ -19,6 +19,18 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
+/// Streaming linear-resampler state. The agent always sends `agent_sample_rate`
+/// PCM (16 kHz); the cpal device may run at a different rate (48 kHz is typical
+/// on macOS/Windows). We resample each incoming chunk on the WS thread before
+/// it lands in the ring, so the realtime audio callback stays a 1:1 consumer.
+/// `pos` is the fractional read cursor into the *next* chunk (carried across
+/// chunk boundaries); `prev` is the last sample of the previous chunk, used as
+/// the left interpolation neighbour for samples that fall before chunk[0].
+struct ResampleState {
+    pos: f64,
+    prev: i16,
+}
+
 /// Shared playback handle. Cheap to clone (Arc internally). The cpal stream
 /// itself is `!Send` on Linux; we keep it inside a `Mutex<Option<Stream>>`
 /// guarded behind this handle.
@@ -29,21 +41,68 @@ pub struct PlaybackHandle {
     /// arriving with an `event_id <= last_interrupt_id` are dropped (matches
     /// the Python SDK contract).
     last_interrupt_id: Arc<AtomicU64>,
+    /// Rate the cpal output stream actually runs at — the ring holds samples
+    /// at this rate.
     output_sample_rate: u32,
+    /// Rate the agent sends PCM at (16 kHz). When it differs from
+    /// `output_sample_rate` we resample on push.
+    agent_sample_rate: u32,
+    resampler: Arc<Mutex<ResampleState>>,
 }
 
 impl PlaybackHandle {
     /// Push raw PCM16 little-endian bytes into the ring. Called by the WS
-    /// receiver after decoding `audio_event.audio_base_64`.
+    /// receiver after decoding `audio_event.audio_base_64`. When the device
+    /// rate differs from the agent rate the chunk is linearly resampled here
+    /// so the cpal callback can stay a plain 1:1 consumer.
     pub fn push_pcm16_le(&self, bytes: &[u8]) {
-        let mut ring = self.ring.lock();
         // Decode pairs of LE bytes; tolerate an odd trailing byte by ignoring it.
-        let mut iter = bytes.chunks_exact(2);
-        ring.reserve(bytes.len() / 2);
-        for pair in iter.by_ref() {
-            let sample = i16::from_le_bytes([pair[0], pair[1]]);
-            ring.push_back(sample);
+        let chunk: Vec<i16> = bytes
+            .chunks_exact(2)
+            .map(|p| i16::from_le_bytes([p[0], p[1]]))
+            .collect();
+        if chunk.is_empty() {
+            return;
         }
+
+        let mut ring = self.ring.lock();
+
+        // Fast path: rates match (e.g. Linux ALSA `default` opens at 16 kHz).
+        if self.agent_sample_rate == self.output_sample_rate {
+            ring.reserve(chunk.len());
+            ring.extend(chunk.iter().copied());
+            return;
+        }
+
+        // Streaming linear interpolation. Virtual input array `v` has length
+        // chunk.len()+1: v[0] = prev (carried from last chunk), v[k] = chunk[k-1].
+        let step = self.agent_sample_rate as f64 / self.output_sample_rate as f64;
+        let mut rs = self.resampler.lock();
+        let n = chunk.len();
+        // `prev` is fixed for the whole chunk — copy it out so the closure
+        // doesn't hold an immutable borrow of `rs` across `rs.pos` writes.
+        let prev = rs.prev;
+        let get = |i: usize| -> f64 {
+            if i == 0 {
+                prev as f64
+            } else {
+                chunk[i - 1] as f64
+            }
+        };
+        // Rough output-sample estimate keeps the ring from re-allocating chunk-by-chunk.
+        ring.reserve(((n as f64) / step) as usize + 1);
+        while rs.pos < n as f64 {
+            let i0 = rs.pos.floor() as usize;
+            let frac = rs.pos - i0 as f64;
+            let a = get(i0);
+            let b = get(i0 + 1);
+            let s = a + (b - a) * frac;
+            ring.push_back(s.round().clamp(i16::MIN as f64, i16::MAX as f64) as i16);
+            rs.pos += step;
+        }
+        // Shift the frame: next chunk's index 0 is this chunk's last sample.
+        rs.pos -= n as f64;
+        rs.prev = chunk[n - 1];
     }
 
     /// Decode a base64-encoded PCM16-LE blob and enqueue.
@@ -100,14 +159,19 @@ impl Playback {
         let device_name = device.name().unwrap_or_else(|_| "unknown".into());
 
         let (config, sample_format) = pick_output_config(&device, sample_rate)?;
+        let device_rate = config.sample_rate.0;
+        if device_rate != sample_rate {
+            log::info!(
+                "voice/playback: device rate {device_rate}Hz != agent rate {sample_rate}Hz — resampling on push"
+            );
+        }
         log::info!(
-            "voice/playback: device='{device_name}' rate={} ch={} fmt={sample_format:?}",
-            config.sample_rate.0,
+            "voice/playback: device='{device_name}' rate={device_rate} ch={} fmt={sample_format:?}",
             config.channels
         );
 
         let ring: Arc<Mutex<VecDeque<i16>>> = Arc::new(Mutex::new(VecDeque::with_capacity(
-            sample_rate as usize, // 1 second of buffering capacity
+            device_rate as usize, // ~1 second of buffering capacity
         )));
         let last_interrupt_id = Arc::new(AtomicU64::new(0));
 
@@ -162,7 +226,9 @@ impl Playback {
             handle: PlaybackHandle {
                 ring,
                 last_interrupt_id,
-                output_sample_rate: config.sample_rate.0,
+                output_sample_rate: device_rate,
+                agent_sample_rate: sample_rate,
+                resampler: Arc::new(Mutex::new(ResampleState { pos: 0.0, prev: 0 })),
             },
             device_name,
         })
@@ -314,6 +380,8 @@ mod tests {
             ring: Arc::new(Mutex::new(VecDeque::new())),
             last_interrupt_id: Arc::new(AtomicU64::new(0)),
             output_sample_rate: 16_000,
+            agent_sample_rate: 16_000,
+            resampler: Arc::new(Mutex::new(ResampleState { pos: 0.0, prev: 0 })),
         };
         // PCM16-LE bytes for samples [1, -1, 1000]: 01 00, FF FF, E8 03
         let bytes = vec![0x01, 0x00, 0xFF, 0xFF, 0xE8, 0x03];
@@ -331,6 +399,8 @@ mod tests {
             ring: Arc::new(Mutex::new(VecDeque::from([1_i16, 2, 3]))),
             last_interrupt_id: Arc::new(AtomicU64::new(0)),
             output_sample_rate: 16_000,
+            agent_sample_rate: 16_000,
+            resampler: Arc::new(Mutex::new(ResampleState { pos: 0.0, prev: 0 })),
         };
         handle.interrupt(99);
         assert_eq!(handle.pending_samples(), 0);
@@ -345,9 +415,57 @@ mod tests {
             ring: Arc::new(Mutex::new(VecDeque::new())),
             last_interrupt_id: Arc::new(AtomicU64::new(0)),
             output_sample_rate: 16_000,
+            agent_sample_rate: 16_000,
+            resampler: Arc::new(Mutex::new(ResampleState { pos: 0.0, prev: 0 })),
         };
         // PCM16-LE for [42]: 2A 00 → base64 "KgA="
         handle.push_base64("KgA=").unwrap();
         assert_eq!(handle.ring.lock().pop_front(), Some(42));
+    }
+
+    #[test]
+    fn resamples_16k_to_48k() {
+        // Agent sends 16 kHz, device runs at 48 kHz → expect ~3x output samples.
+        let handle = PlaybackHandle {
+            ring: Arc::new(Mutex::new(VecDeque::new())),
+            last_interrupt_id: Arc::new(AtomicU64::new(0)),
+            output_sample_rate: 48_000,
+            agent_sample_rate: 16_000,
+            resampler: Arc::new(Mutex::new(ResampleState { pos: 0.0, prev: 0 })),
+        };
+        // 100 input samples of a constant value → output should be ~300 samples,
+        // all equal to that value (interpolating between equal points is flat).
+        let mut bytes = Vec::new();
+        for _ in 0..100 {
+            bytes.extend_from_slice(&1000_i16.to_le_bytes());
+        }
+        handle.push_pcm16_le(&bytes);
+        let produced = handle.pending_samples();
+        assert!(
+            (295..=305).contains(&produced),
+            "expected ~300 samples, got {produced}"
+        );
+        // After the very first interpolated sample (which blends from prev=0),
+        // the steady-state samples must equal the input level.
+        let ring = handle.ring.lock();
+        assert_eq!(ring[150], 1000);
+    }
+
+    #[test]
+    fn resample_identity_when_rates_match() {
+        let handle = PlaybackHandle {
+            ring: Arc::new(Mutex::new(VecDeque::new())),
+            last_interrupt_id: Arc::new(AtomicU64::new(0)),
+            output_sample_rate: 16_000,
+            agent_sample_rate: 16_000,
+            resampler: Arc::new(Mutex::new(ResampleState { pos: 0.0, prev: 0 })),
+        };
+        let bytes = vec![0x01, 0x00, 0xFF, 0xFF, 0xE8, 0x03];
+        handle.push_pcm16_le(&bytes);
+        assert_eq!(handle.pending_samples(), 3);
+        let mut ring = handle.ring.lock();
+        assert_eq!(ring.pop_front(), Some(1));
+        assert_eq!(ring.pop_front(), Some(-1));
+        assert_eq!(ring.pop_front(), Some(1000));
     }
 }

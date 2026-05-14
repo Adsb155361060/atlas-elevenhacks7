@@ -188,14 +188,17 @@ pub fn start_if_configured<R: Runtime>(app: &AppHandle<R>) -> Result<Option<Voic
 
 fn default_dynamic_variables() -> HashMap<String, Value> {
     let mut vars = HashMap::new();
-    // Optional user-name pulled from $USER for {{user_name}} in system prompt.
-    // Falls back to empty (the ElevenLabs dashboard placeholder default "there"
-    // covers it).
-    if let Ok(user) = env::var("USER") {
-        if !user.is_empty() {
-            vars.insert("user_name".to_string(), Value::String(user));
-        }
-    }
+    // Best-effort user name for any `{{user_name}}` placeholder still in the
+    // agent config. `$USER` is Unix-only — Windows exposes `USERNAME` — so we
+    // check both, then fall back to a literal. Sending *something* matters:
+    // ElevenLabs hard-closes the session ("Missing required dynamic variables")
+    // if the agent's first message references a variable we never provide.
+    let user = env::var("USER")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| env::var("USERNAME").ok().filter(|s| !s.is_empty()))
+        .unwrap_or_else(|| "Boss".to_string());
+    vars.insert("user_name".to_string(), Value::String(user));
     vars
 }
 

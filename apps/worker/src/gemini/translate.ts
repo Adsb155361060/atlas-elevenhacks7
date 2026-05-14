@@ -28,6 +28,22 @@ import type {
 
 const DEFAULT_MAX_TOKENS = 2048;
 
+/**
+ * Lower bound on `maxOutputTokens` *regardless of what the caller sent*.
+ *
+ * Gemini 2.5 Pro uses internal "thinking" tokens that count against the
+ * output budget — empirically ~150-200 before any visible content. If the
+ * caller (e.g. ElevenLabs Conv-AI) sends `max_tokens: 100`, Pro burns the
+ * whole budget on thoughts, emits a single whitespace token, hits
+ * `finishReason: "length"`, and the downstream consumer treats the empty
+ * response as `custom_llm_error: Failed to generate response`.
+ *
+ * 2048 leaves plenty of headroom for thinking + a multi-sentence answer +
+ * tool-call arguments. Doesn't materially increase cost — Gemini bills only
+ * for tokens *actually generated*, not the cap.
+ */
+const MIN_OUTPUT_TOKENS = 2048;
+
 export interface GeminiPart {
   text?: string;
   inlineData?: { mimeType: string; data: string };
@@ -111,8 +127,10 @@ export function openaiRequestToGemini(
   const generationConfig: NonNullable<GeminiRequestBody['generationConfig']> = {};
   if (req.temperature !== undefined) generationConfig.temperature = req.temperature;
   if (req.top_p !== undefined) generationConfig.topP = req.top_p;
-  generationConfig.maxOutputTokens =
-    req.max_tokens ?? opts.defaultMaxTokens ?? DEFAULT_MAX_TOKENS;
+  generationConfig.maxOutputTokens = Math.max(
+    req.max_tokens ?? opts.defaultMaxTokens ?? DEFAULT_MAX_TOKENS,
+    MIN_OUTPUT_TOKENS,
+  );
   if (req.stop !== undefined) {
     generationConfig.stopSequences = Array.isArray(req.stop) ? req.stop : [req.stop];
   }

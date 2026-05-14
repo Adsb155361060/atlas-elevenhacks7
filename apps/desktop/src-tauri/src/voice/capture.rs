@@ -60,11 +60,11 @@ impl AgentCapture {
         let sample_rate = config.sample_rate.0;
         let channels = config.channels as usize;
 
-        let downsample = if sample_rate >= TARGET_SAMPLE_RATE {
-            sample_rate / TARGET_SAMPLE_RATE
-        } else {
-            1
-        };
+        if sample_rate != TARGET_SAMPLE_RATE {
+            log::info!(
+                "voice/capture: device rate {sample_rate}Hz != target {TARGET_SAMPLE_RATE}Hz — resampling each frame"
+            );
+        }
 
         log::info!(
             "voice/capture: device='{device_name}' rate={sample_rate} ch={channels} fmt={sample_format:?}"
@@ -80,11 +80,12 @@ impl AgentCapture {
                 let acc = accumulator.clone();
                 let tx = tx.clone();
                 let muted = mute_flag.clone();
+                let mut resampler = Resampler::new(sample_rate, TARGET_SAMPLE_RATE);
                 device.build_input_stream(
                     &config,
                     move |data: &[i16], _| {
                         let mono = mix_to_mono_i16(data, channels);
-                        let down = decimate(&mono, downsample);
+                        let down = resampler.process(&mono);
                         accumulate(&acc, &down, &tx, &muted);
                     },
                     err_fn,
@@ -95,11 +96,12 @@ impl AgentCapture {
                 let acc = accumulator.clone();
                 let tx = tx.clone();
                 let muted = mute_flag.clone();
+                let mut resampler = Resampler::new(sample_rate, TARGET_SAMPLE_RATE);
                 device.build_input_stream(
                     &config,
                     move |data: &[f32], _| {
                         let mono = mix_to_mono_f32_as_i16(data, channels);
-                        let down = decimate(&mono, downsample);
+                        let down = resampler.process(&mono);
                         accumulate(&acc, &down, &tx, &muted);
                     },
                     err_fn,
@@ -110,12 +112,13 @@ impl AgentCapture {
                 let acc = accumulator.clone();
                 let tx = tx.clone();
                 let muted = mute_flag.clone();
+                let mut resampler = Resampler::new(sample_rate, TARGET_SAMPLE_RATE);
                 device.build_input_stream(
                     &config,
                     move |data: &[u16], _| {
                         let i16_buf: Vec<i16> = data.iter().map(|&u| u16_to_i16(u)).collect();
                         let mono = mix_to_mono_i16(&i16_buf, channels);
-                        let down = decimate(&mono, downsample);
+                        let down = resampler.process(&mono);
                         accumulate(&acc, &down, &tx, &muted);
                     },
                     err_fn,
@@ -126,6 +129,7 @@ impl AgentCapture {
                 let acc = accumulator.clone();
                 let tx = tx.clone();
                 let muted = mute_flag.clone();
+                let mut resampler = Resampler::new(sample_rate, TARGET_SAMPLE_RATE);
                 device.build_input_stream(
                     &config,
                     move |data: &[u8], _| {
@@ -133,7 +137,7 @@ impl AgentCapture {
                         let i16_buf: Vec<i16> =
                             data.iter().map(|&u| ((u as i16) - 128) << 8).collect();
                         let mono = mix_to_mono_i16(&i16_buf, channels);
-                        let down = decimate(&mono, downsample);
+                        let down = resampler.process(&mono);
                         accumulate(&acc, &down, &tx, &muted);
                     },
                     err_fn,
@@ -307,17 +311,66 @@ fn mix_to_mono_f32_as_i16(data: &[f32], channels: usize) -> Vec<i16> {
         .collect()
 }
 
-fn decimate(samples: &[i16], factor: u32) -> Vec<i16> {
-    if factor <= 1 {
-        return samples.to_vec();
+/// Streaming linear resampler, mono i16. The old code did integer
+/// `decimate(rate / 16000)` which only lands on exactly 16 kHz when the
+/// device rate is an integer multiple — true for 48 kHz (the usual Windows
+/// WASAPI / macOS CoreAudio default) but *not* for 44.1 kHz, where
+/// `44100 / 16000 == 2` produced 22.05 kHz audio that we then mislabeled as
+/// 16 kHz, so ElevenLabs heard the user pitched-down and slow → ASR failed.
+/// Linear interpolation handles any `src_rate → dst_rate` ratio. State
+/// (`pos`, `prev`) carries across cpal callbacks so chunk seams don't click.
+struct Resampler {
+    src_rate: u32,
+    dst_rate: u32,
+    pos: f64,
+    prev: i16,
+}
+
+impl Resampler {
+    fn new(src_rate: u32, dst_rate: u32) -> Self {
+        Self {
+            src_rate,
+            dst_rate,
+            pos: 0.0,
+            prev: 0,
+        }
     }
-    let factor = factor as usize;
-    let mut out = Vec::with_capacity(samples.len() / factor + 1);
-    for window in samples.chunks(factor) {
-        let sum: i32 = window.iter().map(|&s| s as i32).sum();
-        out.push((sum / window.len() as i32) as i16);
+
+    fn process(&mut self, chunk: &[i16]) -> Vec<i16> {
+        if chunk.is_empty() {
+            return Vec::new();
+        }
+        // Fast path: device already at target rate (Linux ALSA `default`).
+        if self.src_rate == self.dst_rate {
+            return chunk.to_vec();
+        }
+        // Virtual input `v` has length chunk.len()+1: v[0] = prev (last sample
+        // of the previous chunk), v[k] = chunk[k-1].
+        let step = self.src_rate as f64 / self.dst_rate as f64;
+        let n = chunk.len();
+        let prev = self.prev;
+        let get = |i: usize| -> f64 {
+            if i == 0 {
+                prev as f64
+            } else {
+                chunk[i - 1] as f64
+            }
+        };
+        let mut out = Vec::with_capacity(((n as f64) / step) as usize + 1);
+        while self.pos < n as f64 {
+            let i0 = self.pos.floor() as usize;
+            let frac = self.pos - i0 as f64;
+            let a = get(i0);
+            let b = get(i0 + 1);
+            let s = a + (b - a) * frac;
+            out.push(s.round().clamp(i16::MIN as f64, i16::MAX as f64) as i16);
+            self.pos += step;
+        }
+        // Shift the frame: next chunk's index 0 is this chunk's last sample.
+        self.pos -= n as f64;
+        self.prev = chunk[n - 1];
+        out
     }
-    out
 }
 
 fn f32_to_i16(s: &f32) -> i16 {
@@ -377,8 +430,40 @@ mod tests {
     }
 
     #[test]
-    fn decimate_factor_3_box_filter() {
-        let data: Vec<i16> = vec![3, 3, 3, 6, 6, 6, 9, 9, 9];
-        assert_eq!(decimate(&data, 3), vec![3, 6, 9]);
+    fn resampler_identity_when_rates_match() {
+        let mut r = Resampler::new(16_000, 16_000);
+        let data: Vec<i16> = vec![3, -7, 100, 9];
+        assert_eq!(r.process(&data), data);
+    }
+
+    #[test]
+    fn resampler_48k_to_16k_thirds_the_rate() {
+        let mut r = Resampler::new(48_000, 16_000);
+        // 300 input samples of a constant value → ~100 output samples, and
+        // (interpolating between equal points) every steady-state sample
+        // equals the input level.
+        let input = vec![1234_i16; 300];
+        let out = r.process(&input);
+        assert!(
+            (98..=102).contains(&out.len()),
+            "expected ~100 samples, got {}",
+            out.len()
+        );
+        assert_eq!(out[50], 1234);
+    }
+
+    #[test]
+    fn resampler_44100_to_16k_is_not_integer_decimation() {
+        // The bug this replaces: 44100 / 16000 == 2 (integer), so the old
+        // code produced 22050 Hz. The resampler must produce ~16000/44100 of
+        // the input, i.e. clearly fewer than the old "half" would.
+        let mut r = Resampler::new(44_100, 16_000);
+        let out = r.process(&vec![0_i16; 44_100]);
+        // 44100 @ 44.1k → ~16000 @ 16k. Old decimate(2) gave 22050.
+        assert!(
+            (15_900..=16_100).contains(&out.len()),
+            "expected ~16000 samples, got {}",
+            out.len()
+        );
     }
 }

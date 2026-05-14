@@ -1,16 +1,18 @@
-//! `vision_qa` client tool — Claude reads what's on your screen or
+//! `vision_qa` client tool — the assistant reads what's on your screen or
 //! what's in front of your camera.
 //!
 //! Flow (when the agent calls vision_qa({question, source?})):
 //!   1. Capture an image:
 //!      - `source: "screen"` (default) — runs an OS-level capture
-//!        (`screencapture` on macOS, `grim`/`scrot` on Linux).
-//!      - `source: "camera"` — emits `atlas:vision:capture_camera` to
-//!        the webview, which calls `getUserMedia` + canvas to snap a
-//!        frame and delivers it back via the `vision_camera_deliver`
-//!        Tauri command. Bridge via an in-process oneshot map.
+//!        (`screencapture` on macOS, `grim`/`scrot` on Linux,
+//!        PowerShell + System.Drawing on Windows).
+//!      - `source: "camera"` — Linux captures natively via ffmpeg/v4l2;
+//!        macOS/Windows emit `atlas:vision:capture_camera` to the webview,
+//!        which calls `getUserMedia` + canvas to snap a frame and delivers
+//!        it back via the `vision_camera_deliver` Tauri command. Bridge via
+//!        an in-process oneshot map.
 //!   2. POST PNG + question to Worker `/v1/tools/vision_qa` as
-//!      multipart. Worker forwards to Anthropic vision and returns
+//!      multipart. Worker forwards to Gemini vision and returns
 //!      `{answer, model}`.
 //!   3. Return the answer text to the agent via client_tool_result.
 
@@ -20,7 +22,7 @@ use parking_lot::Mutex;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-#[cfg(any(target_os = "linux", target_os = "macos"))]
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
 use std::process::Command;
 use std::sync::OnceLock;
 #[cfg(not(target_os = "linux"))]
@@ -131,7 +133,41 @@ fn capture_screen() -> Result<Vec<u8>> {
 
 #[cfg(target_os = "windows")]
 fn capture_screen() -> Result<Vec<u8>> {
-    Err(anyhow!("Windows screen capture isn't wired yet"))
+    // No `screencapture`/`grim` equivalent ships with Windows, but every
+    // Windows box has PowerShell + System.Drawing. Capture the whole virtual
+    // screen (all monitors) to a temp PNG, read it back, delete it. We go via
+    // a file rather than stdout because piping raw PNG bytes through
+    // PowerShell's stdout reliably corrupts them (text-mode encoding).
+    let tmp = std::env::temp_dir().join(format!("atlas_screen_{}.png", std::process::id()));
+    // Single-quote the path for the PowerShell string literal; escape any
+    // embedded single quote by doubling it.
+    let tmp_lit = tmp.to_string_lossy().replace('\'', "''");
+    let script = format!(
+        "Add-Type -AssemblyName System.Windows.Forms,System.Drawing; \
+         $b = [System.Windows.Forms.SystemInformation]::VirtualScreen; \
+         $bmp = New-Object System.Drawing.Bitmap($b.Width, $b.Height); \
+         $g = [System.Drawing.Graphics]::FromImage($bmp); \
+         $g.CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size); \
+         $bmp.Save('{tmp_lit}', [System.Drawing.Imaging.ImageFormat]::Png); \
+         $g.Dispose(); $bmp.Dispose()"
+    );
+    let output = Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .output()
+        .context("invoke powershell for screen capture")?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(anyhow!(
+            "powershell screen capture exited {}: {stderr}",
+            output.status
+        ));
+    }
+    let bytes = std::fs::read(&tmp).context("read captured screenshot file")?;
+    let _ = std::fs::remove_file(&tmp);
+    if bytes.is_empty() {
+        return Err(anyhow!("screen capture produced no bytes"));
+    }
+    Ok(bytes)
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]

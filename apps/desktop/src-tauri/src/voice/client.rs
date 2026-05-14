@@ -456,7 +456,9 @@ mod tests {
         };
         let msg = build_initiation(&cfg);
         assert!(msg.contains(r#""type":"conversation_initiation_client_data""#));
-        assert!(msg.contains(r#""source":"atlas_desktop""#));
+        // `source_info` is intentionally omitted — sending it tripped
+        // ElevenLabs's signed-URL signature check (HTTP 403 on connect).
+        assert!(!msg.contains("source_info"));
         assert!(!msg.contains("dynamic_variables"));
         assert!(!msg.contains("custom_llm_extra_body"));
         assert!(!msg.contains("conversation_config_override"));

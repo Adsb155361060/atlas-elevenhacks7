@@ -84,13 +84,11 @@ async function callGemini(
 
   if (!resp.ok || !resp.body) {
     const errText = await resp.text().catch(() => '');
-    console.error('gemini upstream fail:', resp.status, errText.slice(0, 1000));
     throw new GeminiUpstreamError(
       resp.status,
       `Gemini ${resp.status} ${resp.statusText}: ${errText.slice(0, 500)}`,
     );
   }
-  console.log('gemini stream opened:', model);
 
   return iterateSse(resp.body);
 }
@@ -104,12 +102,15 @@ export class GeminiUpstreamError extends Error {
   }
   /**
    * Classes of failures that warrant a fallback retry rather than surfacing
-   * the error. 503 (overloaded), 429 (rate-limited), 5xx in general, and 404
-   * (model not found / not yet rolled out to the project) are all transient
-   * or model-specific.
+   * the error. 503 (overloaded), 429 (rate-limited), 5xx in general, 404
+   * (model not found / not yet rolled out to the project), and 400 (model
+   * rejected the request shape — observed with Gemini 3's missing
+   * `thoughtSignature` in functionCall history) all retry against the
+   * fallback model.
    */
   isCapacityClass(): boolean {
     return (
+      this.status === 400 ||
       this.status === 404 ||
       this.status === 429 ||
       (this.status >= 500 && this.status < 600)

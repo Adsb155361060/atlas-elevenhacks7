@@ -15,9 +15,15 @@ compatibility_flags = ["nodejs_compat"]
 WORKER_VERSION = "0.0.3"
 # Use the strongest Gemini model first; on 429/5xx/model-not-found the
 # worker auto-falls-back to FALLBACK_LLM_MODEL without surfacing the error.
-DEFAULT_LLM_MODEL = "gemini-3-flash-preview"
-FALLBACK_LLM_MODEL = "gemini-2.5-flash"
-ROUTER_TOOL_MODEL = "gemini-3-flash-preview"
+# Gemini 3 Flash Preview requires thoughtSignature roundtripping on
+# every prior functionCall in the conversation history. The OpenAI
+# Chat-Completions wire format ElevenLabs uses can't carry those
+# signatures, so multi-turn-with-tool-use chats hit a 400 on the second
+# LLM call. Until we implement signature preservation, stay on 2.5 Flash
+# which has no such requirement.
+DEFAULT_LLM_MODEL = "gemini-2.5-flash"
+FALLBACK_LLM_MODEL = "gemini-2.5-flash-lite"
+ROUTER_TOOL_MODEL = "gemini-2.5-flash"
 ROUTER_TRIAGE_MODEL = "gemini-2.5-flash-lite"
 DEFAULT_ANTHROPIC_MODEL = "claude-opus-4-7"   # legacy — vision_qa only
 DAILY_LLM_BUDGET_USD = "20"

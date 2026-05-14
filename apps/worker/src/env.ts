@@ -36,11 +36,11 @@ export const EnvSchema = z.object({
 
   // Plain vars (wrangler.toml [vars])
   WORKER_VERSION: z.string().default('0.0.0'),
-  DEFAULT_LLM_MODEL: ModelId.default('gemini-3-flash-preview'),
-  FALLBACK_LLM_MODEL: ModelId.default('gemini-2.5-flash').describe(
+  DEFAULT_LLM_MODEL: ModelId.default('gemini-2.5-flash'),
+  FALLBACK_LLM_MODEL: ModelId.default('gemini-2.5-flash-lite').describe(
     'Used by the chat completions client when the primary returns 429 / 5xx / model-not-found. Set to an empty string in test envs to disable.',
   ),
-  ROUTER_TOOL_MODEL: ModelId.default('gemini-3-flash-preview'),
+  ROUTER_TOOL_MODEL: ModelId.default('gemini-2.5-flash'),
   ROUTER_TRIAGE_MODEL: ModelId.default('gemini-2.5-flash-lite'),
   // Legacy alias — still consumed by the Anthropic-backed vision_qa route.
   DEFAULT_ANTHROPIC_MODEL: ModelId.default('claude-opus-4-7'),

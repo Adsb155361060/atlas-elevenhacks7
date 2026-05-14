@@ -181,7 +181,15 @@ pub enum ClientEvent<'a> {
         conversation_config_override: Option<&'a Value>,
         #[serde(skip_serializing_if = "Option::is_none")]
         dynamic_variables: Option<&'a HashMap<String, Value>>,
-        source_info: SourceInfo<'a>,
+        /// Optional analytics tag. ElevenLabs' Pydantic validator restricts
+        /// `source` to a fixed enum at runtime, even though the field is
+        /// documented as free-form. Sending our own "atlas_desktop" string
+        /// triggers a server-side "1 validation error … source_info.source"
+        /// close immediately after the metadata response. Easiest fix: omit
+        /// the whole struct — ElevenLabs accepts that and the session opens
+        /// normally. We can re-add it once they whitelist our source name.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        source_info: Option<SourceInfo<'a>>,
         #[serde(skip_serializing_if = "Option::is_none")]
         user_id: Option<&'a str>,
     },
@@ -337,17 +345,15 @@ mod tests {
             custom_llm_extra_body: None,
             conversation_config_override: None,
             dynamic_variables: Some(&vars),
-            source_info: SourceInfo {
-                source: "atlas_desktop",
-                version: "0.0.1",
-            },
+            source_info: None,
             user_id: None,
         };
         let json = serde_json::to_string(&evt).unwrap();
         assert!(json.contains(r#""type":"conversation_initiation_client_data""#));
         assert!(json.contains(r#""dynamic_variables":{"user_name":"Aditya"}"#));
-        assert!(json.contains(r#""source":"atlas_desktop""#));
-        // Confirm Option::None fields are stripped.
+        // source_info is intentionally omitted so the ElevenLabs validator
+        // doesn't trip on our non-whitelisted source value.
+        assert!(!json.contains("source_info"));
         assert!(!json.contains("custom_llm_extra_body"));
         assert!(!json.contains("user_id"));
     }

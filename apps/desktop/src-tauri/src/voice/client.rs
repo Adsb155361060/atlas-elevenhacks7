@@ -351,12 +351,12 @@ fn build_initiation(config: &SessionConfig) -> String {
         } else {
             Some(&config.dynamic_variables)
         },
-        source_info: SourceInfo {
-            source: SOURCE_NAME,
-            version: SOURCE_VERSION,
-        },
+        // See protocol.rs — omitted on purpose; ElevenLabs rejects our value.
+        source_info: None,
         user_id: config.user_id.as_deref(),
     };
+    let _ = SOURCE_NAME;
+    let _ = SOURCE_VERSION;
     serde_json::to_string(&evt).expect("serialize init message")
 }
 

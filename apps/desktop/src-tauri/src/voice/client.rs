@@ -21,7 +21,7 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
 
 use super::playback::{self, PlaybackHandle};
-use super::protocol::{self, ClientEvent, ServerEvent, SourceInfo};
+use super::protocol::{self, ClientEvent, ServerEvent};
 
 const SOURCE_NAME: &str = "atlas_desktop";
 const SOURCE_VERSION: &str = env!("CARGO_PKG_VERSION");

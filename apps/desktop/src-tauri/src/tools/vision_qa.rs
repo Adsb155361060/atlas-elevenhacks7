@@ -23,8 +23,11 @@ use std::collections::HashMap;
 #[cfg(any(target_os = "linux", target_os = "macos"))]
 use std::process::Command;
 use std::sync::OnceLock;
+#[cfg(not(target_os = "linux"))]
 use std::time::Duration;
-use tauri::{AppHandle, Emitter, Runtime};
+use tauri::{AppHandle, Runtime};
+#[cfg(not(target_os = "linux"))]
+use tauri::Emitter;
 use tokio::runtime::Handle;
 use tokio::sync::oneshot;
 
@@ -65,7 +68,7 @@ pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult
             Ok(b) => b,
             Err(err) => return ToolResult::err(format!("vision_qa: capture screen: {err:#}")),
         },
-        "camera" => match tokio::task::block_in_place(|| handle.block_on(capture_camera(app))) {
+        "camera" => match capture_camera_dispatch(app, &handle) {
             Ok(b) => b,
             Err(err) => return ToolResult::err(format!("vision_qa: capture camera: {err:#}")),
         },
@@ -136,19 +139,92 @@ fn capture_screen() -> Result<Vec<u8>> {
     Err(anyhow!("vision_qa: unsupported platform"))
 }
 
-// ───────────────────────── camera bridge ─────────────────────────
+// ───────────────────────── camera capture dispatch ─────────────────────────
 //
-// Rust can't reach the webcam from inside a Tauri app without an extra
-// native plugin. The webview can — `getUserMedia` + a `<canvas>` snapshot
-// gives us PNG bytes. To bridge:
+// Two strategies, picked by platform:
+//
+//   • Linux  → native v4l2 capture via ffmpeg (`capture_camera_linux`).
+//     WebKit2GTK's embedded webview denies `getUserMedia` for Tauri-loaded
+//     content by default, so the webview bridge silently fails there and
+//     the agent sees "empty bytes". Going straight to /dev/video* through
+//     ffmpeg sidesteps the webview entirely — same approach as our
+//     grim/scrot screen capture.
+//
+//   • macOS / Windows → webview `getUserMedia` bridge (`capture_camera`).
+//     There the WebView relays the OS permission prompt correctly and
+//     getUserMedia works; no native v4l2 equivalent needed.
+
+fn capture_camera_dispatch<R: Runtime>(app: &AppHandle<R>, handle: &Handle) -> Result<Vec<u8>> {
+    #[cfg(target_os = "linux")]
+    {
+        let _ = (app, handle); // unused on Linux — native path takes over
+        capture_camera_linux()
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        tokio::task::block_in_place(|| handle.block_on(capture_camera(app)))
+    }
+}
+
+/// Capture one frame from the default V4L2 device via ffmpeg. ffmpeg ships
+/// (or is one `apt install` away) on essentially every Linux desktop, and
+/// `-f image2pipe -vcodec png -` streams a single PNG to stdout.
+#[cfg(target_os = "linux")]
+fn capture_camera_linux() -> Result<Vec<u8>> {
+    // Try the common device nodes in order. Most laptops expose the
+    // built-in cam at /dev/video0; some enumerate metadata nodes first so
+    // /dev/video1+ can be the real stream.
+    let devices = ["/dev/video0", "/dev/video1", "/dev/video2"];
+    let mut last_err = String::new();
+    for dev in devices {
+        if !std::path::Path::new(dev).exists() {
+            continue;
+        }
+        let out = Command::new("ffmpeg")
+            .args([
+                "-loglevel", "error",
+                "-f", "v4l2",
+                "-i", dev,
+                "-frames:v", "1",
+                "-f", "image2pipe",
+                "-vcodec", "png",
+                "-",
+            ])
+            .output();
+        match out {
+            Ok(o) if o.status.success() && !o.stdout.is_empty() => return Ok(o.stdout),
+            Ok(o) => {
+                last_err = format!(
+                    "ffmpeg on {dev} exited {}: {}",
+                    o.status,
+                    String::from_utf8_lossy(&o.stderr).trim()
+                );
+            }
+            Err(e) => {
+                last_err = format!("ffmpeg not runnable ({e}) — install it: sudo apt install ffmpeg");
+                break;
+            }
+        }
+    }
+    if last_err.is_empty() {
+        Err(anyhow!(
+            "no /dev/video* device found — is a camera connected?"
+        ))
+    } else {
+        Err(anyhow!("{last_err}"))
+    }
+}
+
+// ───────────────────────── webview camera bridge (macOS/Windows) ─────────
+//
+// Rust can't reach the webcam from inside a Tauri app without a native
+// plugin. The webview can — `getUserMedia` + a `<canvas>` snapshot gives
+// us PNG bytes. To bridge:
 //   1. Rust emits `atlas:vision:capture_camera` with a request_id.
 //   2. Frontend listens, captures a frame, base64-encodes it, calls the
 //      `vision_camera_deliver` Tauri command with the same request_id.
 //   3. That command resolves a pending tokio::sync::oneshot, freeing
 //      `capture_camera` to continue.
-//
-// A static `OnceLock<Mutex<HashMap<request_id, Sender<bytes>>>>` holds
-// the pending captures.
 
 type CameraBridge = Mutex<HashMap<String, oneshot::Sender<Vec<u8>>>>;
 
@@ -157,6 +233,7 @@ fn bridge() -> &'static CameraBridge {
     BRIDGE.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+#[cfg(not(target_os = "linux"))]
 async fn capture_camera<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<u8>> {
     let request_id = format!("cam_{}", now_ms());
     let (tx, rx) = oneshot::channel::<Vec<u8>>();
@@ -258,6 +335,7 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
+#[cfg(not(target_os = "linux"))]
 fn now_ms() -> u128 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

@@ -84,11 +84,13 @@ async function callGemini(
 
   if (!resp.ok || !resp.body) {
     const errText = await resp.text().catch(() => '');
+    console.error('gemini upstream fail:', resp.status, errText.slice(0, 1000));
     throw new GeminiUpstreamError(
       resp.status,
       `Gemini ${resp.status} ${resp.statusText}: ${errText.slice(0, 500)}`,
     );
   }
+  console.log('gemini stream opened:', model);
 
   return iterateSse(resp.body);
 }

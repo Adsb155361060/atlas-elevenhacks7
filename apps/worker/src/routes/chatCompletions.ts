@@ -79,6 +79,17 @@ chatCompletions.post('/', async (c) => {
     );
   }
   const req = parsed.data;
+  console.log(
+    'chat/completions in:',
+    JSON.stringify({
+      model: req.model,
+      messages: req.messages.length,
+      tools: req.tools?.length ?? 0,
+      max_tokens: req.max_tokens,
+      stream: req.stream,
+      tool_names: req.tools?.map((t) => t.function.name) ?? [],
+    }),
+  );
 
   if (req.stream === false) {
     return c.json(

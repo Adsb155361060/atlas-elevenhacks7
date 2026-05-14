@@ -50,23 +50,34 @@ export async function* geminiStreamToOpenAIChunks(
         emittedRole = true;
         yield buildChunk(meta, delta, null);
       } else if (part.functionCall) {
-        const delta: OpenAIChunkDelta = {
-          ...(emittedRole ? {} : { role: 'assistant', content: null }),
-          tool_calls: [
-            {
-              index: toolCallIndex,
-              id: `call_${randomToolId()}`,
-              type: 'function',
-              function: {
-                name: part.functionCall.name,
-                arguments: JSON.stringify(part.functionCall.args ?? {}),
+        // Mirror the OpenAI streaming convention more closely: the role +
+        // empty content come in their own chunk, then the tool call lands in
+        // a subsequent chunk. Strict OpenAI-SDK parsers (e.g. ElevenLabs
+        // Conv-AI's custom-LLM runtime) reject a single delta that mixes a
+        // `role` field with `tool_calls`, and they also dislike `content:
+        // null` paired with tool_calls — they want `content: ""`.
+        if (!emittedRole) {
+          yield buildChunk(meta, { role: 'assistant', content: '' }, null);
+          emittedRole = true;
+        }
+        yield buildChunk(
+          meta,
+          {
+            tool_calls: [
+              {
+                index: toolCallIndex,
+                id: `call_${randomToolId()}`,
+                type: 'function',
+                function: {
+                  name: part.functionCall.name,
+                  arguments: JSON.stringify(part.functionCall.args ?? {}),
+                },
               },
-            },
-          ],
-        };
-        emittedRole = true;
+            ],
+          },
+          null,
+        );
         toolCallIndex += 1;
-        yield buildChunk(meta, delta, null);
       }
     }
 

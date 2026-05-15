@@ -505,6 +505,104 @@
       color: var(--brass);
     }
 
+    /* ─── Install guide ──────────────────────────────────────────────────── */
+    .guide-lead {
+      max-width: 780px;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--cream-dim);
+      font-weight: 300;
+      margin-bottom: 14px;
+    }
+    .guide-lead strong { color: var(--cream); font-weight: 400; }
+    .guide-safe {
+      max-width: 780px;
+      margin-bottom: 40px;
+      padding: 14px 18px;
+      border-left: 2px solid var(--brass);
+      background: var(--ink-2);
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--cream-dim);
+      font-weight: 300;
+    }
+    .guide-safe strong { color: var(--brass); font-weight: 500; }
+    .guide-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 28px;
+    }
+    @media (max-width: 860px) {
+      .guide-grid { grid-template-columns: 1fr; gap: 24px; }
+    }
+    .guide-card {
+      padding: 26px 24px;
+      background: var(--ink-2);
+      border: 1px solid var(--hair-strong);
+    }
+    .guide-card h3 {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--brass);
+      margin-bottom: 4px;
+    }
+    .guide-card .guide-os-note {
+      font-size: 12px;
+      color: var(--cream-mute);
+      font-weight: 300;
+      margin-bottom: 18px;
+    }
+    .guide-card h4 {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--cream-mute);
+      margin: 22px 0 12px;
+    }
+    .guide-steps { list-style: none; counter-reset: gs; }
+    .guide-steps li {
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 12px;
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--cream-dim);
+      font-weight: 300;
+    }
+    .guide-steps li::before {
+      counter-increment: gs;
+      content: counter(gs);
+      position: absolute;
+      left: 0; top: 1px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--brass);
+      border: 1px solid var(--brass-deep);
+      width: 17px; height: 17px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .guide-perms { list-style: none; }
+    .guide-perms li {
+      font-size: 13px;
+      line-height: 1.55;
+      color: var(--cream-dim);
+      font-weight: 300;
+      padding: 8px 0;
+      border-top: 1px solid var(--hair);
+    }
+    .guide-perms li:first-child { border-top: none; padding-top: 0; }
+    .guide-perms b { color: var(--cream); font-weight: 500; }
+    .guide-card code, .guide-card kbd {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 1px 5px;
+      background: rgba(20, 17, 14, 0.7);
+      border: 1px solid var(--hair-strong);
+      color: var(--brass);
+    }
+
     /* ─── Download grid ──────────────────────────────────────────────────── */
     .downloads {
       display: grid;
@@ -653,6 +751,7 @@
       <a href="#features">Features</a>
       <a href="#how">How</a>
       <a href="#download">Download</a>
+      <a href="#install">Install</a>
       <a href="https://github.com/Adsb155361060/atlas-elevenhacks7" target="_blank" rel="noreferrer">Repo</a>
     </nav>
   </header>
@@ -1171,10 +1270,92 @@
       </div>
     </section>
 
+    <!-- ─── Install & permissions ──────────────────────────────────────── -->
+    <section class="section" id="install">
+      <div class="section-head">
+        <div class="label label-brass">§05 · Install &amp; permissions</div>
+        <h2>Unsigned, on purpose. <span class="accent">Here's the dance.</span></h2>
+      </div>
+
+      <p class="guide-lead">
+        Atlas isn't on the Mac App Store or the Microsoft Store yet — so the first
+        time you open it, your operating system will show a scary-looking warning.
+        That's expected. It happens to <strong>every</strong> app that ships outside
+        the stores without a paid code-signing certificate ($99/yr from Apple, a
+        pricey EV cert on Windows). It is <strong>not</strong> a sign that anything
+        is wrong with the download.
+      </p>
+      <p class="guide-safe">
+        <strong>Is it safe?</strong> The full source is public on GitHub, and every
+        installer is built in the open by GitHub Actions straight from a tagged
+        commit — nothing is hand-assembled. You can read the code, read the build
+        workflow, and verify the release yourself before you trust it.
+      </p>
+
+      <div class="guide-grid">
+        <!-- macOS -->
+        <div class="guide-card">
+          <h3>macOS</h3>
+          <div class="guide-os-note">Apple Silicon &amp; Intel · macOS 11+</div>
+          <h4>Install</h4>
+          <ol class="guide-steps">
+            <li>Open the <code>.dmg</code> and drag Atlas into your Applications folder.</li>
+            <li>First launch shows <em>"Apple cannot check it for malicious software."</em> Do <b>not</b> click Move to Trash.</li>
+            <li>Right-click (or Control-click) Atlas in Applications → <b>Open</b> → <b>Open</b> again in the dialog.</li>
+            <li>Done — it launches normally every time after that.</li>
+          </ol>
+          <h4>Permissions to grant</h4>
+          <ul class="guide-perms">
+            <li><b>Microphone</b> — required. macOS prompts on the first "Hey Atlas"; click Allow.</li>
+            <li><b>Camera</b> — for "what am I holding" vision. Prompts on first use.</li>
+            <li><b>Screen Recording</b> — for reading your screen &amp; screenshots. System Settings → Privacy &amp; Security → Screen Recording → toggle Atlas on, then relaunch.</li>
+            <li><b>Accessibility</b> — optional, enables deeper app control. Same Privacy pane.</li>
+          </ul>
+        </div>
+
+        <!-- Windows -->
+        <div class="guide-card">
+          <h3>Windows</h3>
+          <div class="guide-os-note">Windows 10 &amp; 11 · x64</div>
+          <h4>Install</h4>
+          <ol class="guide-steps">
+            <li>Run the <code>.exe</code> installer (or the <code>.msi</code>).</li>
+            <li>SmartScreen says <em>"Windows protected your PC."</em> Click <b>More info</b>, then <b>Run anyway</b>.</li>
+            <li>Follow the installer, then launch Atlas from the Start menu.</li>
+          </ol>
+          <h4>Permissions to grant</h4>
+          <ul class="guide-perms">
+            <li><b>Microphone</b> — Settings → Privacy &amp; security → Microphone → turn it on, and make sure <em>"Let desktop apps access your microphone"</em> is also on.</li>
+            <li><b>Camera</b> — same path → Camera → on, including the desktop-apps toggle.</li>
+            <li><b>Screen reading &amp; screenshots</b> — work with no extra prompt.</li>
+          </ul>
+        </div>
+
+        <!-- Linux -->
+        <div class="guide-card">
+          <h3>Linux</h3>
+          <div class="guide-os-note">x64 · .AppImage or .deb</div>
+          <h4>Install</h4>
+          <ol class="guide-steps">
+            <li><b>AppImage:</b> <code>chmod +x Atlas_*.AppImage</code>, then run it. <b>Or .deb:</b> <code>sudo dpkg -i Atlas_*.deb</code>.</li>
+            <li>No store warning — Linux just runs it.</li>
+            <li>Install <code>ffmpeg</code> (camera) and <code>grim</code> or <code>scrot</code> (screen capture) if they aren't already there.</li>
+          </ol>
+          <h4>Permissions to grant</h4>
+          <ul class="guide-perms">
+            <li><b>Microphone</b> — works through PulseAudio / PipeWire; no per-app gate.</li>
+            <li><b>Camera</b> — your user must be in the <code>video</code> group and <code>ffmpeg</code> must be installed.</li>
+            <li><b>Screen capture</b> — needs <code>grim</code> (Wayland) or <code>scrot</code> (X11).</li>
+            <li><b>Hotkey note</b> — the global <kbd>Ctrl</kbd>+<kbd>⇧</kbd>+<kbd>A</kbd> may not fire on Wayland; use the tray icon or the in-app button to wake Atlas.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
     <!-- ─── Stack ──────────────────────────────────────────────────────── -->
     <section class="section">
       <div class="section-head">
-        <div class="label label-brass">§05 · Stack</div>
+        <div class="label label-brass">§06 · Stack</div>
         <h2>Built on <span class="accent">good plumbing.</span></h2>
       </div>
       <div class="stack">

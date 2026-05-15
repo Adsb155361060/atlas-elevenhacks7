@@ -15,6 +15,7 @@
 mod battery_status;
 mod calendar;
 mod clipboard;
+mod compose_email;
 mod find_files;
 mod launch_app;
 mod lock_screen;
@@ -23,6 +24,7 @@ mod notes;
 mod open_path;
 mod render_artifact;
 mod screenshot;
+mod send_email;
 mod system_action;
 mod timer;
 pub mod vision_qa;
@@ -74,6 +76,8 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, name: &str, parameters: &Value) 
         "battery_status" => battery_status::execute(app, parameters),
         "lock_screen" => lock_screen::execute(app, parameters),
         "screenshot" => screenshot::execute(app, parameters),
+        "compose_email" => compose_email::execute(app, parameters),
+        "send_email" => send_email::execute(app, parameters),
         other => ToolResult::err(format!(
             "tool '{other}' is not implemented on the desktop client (Phase 1.x)"
         )),

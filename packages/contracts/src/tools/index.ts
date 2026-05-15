@@ -671,6 +671,62 @@ const SCREENSHOT: ToolSpec = {
   },
 };
 
+const COMPOSE_EMAIL: ToolSpec = {
+  name: 'compose_email',
+  description:
+    "Open a prefilled email draft in the user's default mail client (Outlook / Mail.app / Gmail web). Use when the user dictates an email: 'email Boss, subject: lunch, tell them I'll be late'. Always speak a one-sentence read-back of the draft before calling so they can correct it ('Draft to boss@: I'll be late to lunch — open it now?'). The user still presses Send themselves in the mail window. For fully hands-free sending, use send_email instead (requires one-time Gmail-API setup).",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {
+      to: { type: 'string', description: 'Recipient email address. Required.' },
+      subject: { type: 'string', description: 'Subject line. Recommended.' },
+      body: { type: 'string', description: 'Email body, plain text. Multi-line ok.' },
+      cc: { type: 'string', description: 'Optional CC, comma-separated.' },
+      bcc: { type: 'string', description: 'Optional BCC, comma-separated.' },
+    },
+    required: ['to'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: { composed: { type: 'boolean' } },
+    required: ['composed'],
+    additionalProperties: false,
+  },
+};
+
+const SEND_EMAIL: ToolSpec = {
+  name: 'send_email',
+  description:
+    "Send an email hands-free via the Gmail API. The user does NOT touch the keyboard — the message goes straight from voice to inbox. Always confirm aloud BEFORE calling ('Sending to a@b.com, subject \"Late\", body \"…\" — okay?'), and only proceed on a clear yes. If the user just dictates without explicit send intent, use compose_email instead. Requires a one-time OAuth setup; if it returns a configuration error, gracefully fall back to compose_email.",
+  location: 'desktop',
+  confirm_required: true,
+  params: {
+    type: 'object',
+    properties: {
+      to: { type: 'string', description: 'Recipient email address. Required.' },
+      subject: { type: 'string', description: 'Subject line.' },
+      body: { type: 'string', description: 'Email body, plain text.' },
+      cc: { type: 'string', description: 'Optional CC, comma-separated.' },
+      bcc: { type: 'string', description: 'Optional BCC, comma-separated.' },
+    },
+    required: ['to'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      sent: { type: 'boolean' },
+      message_id: { type: 'string' },
+      thread_id: { type: 'string' },
+    },
+    required: ['sent'],
+    additionalProperties: false,
+  },
+};
+
 // ───────────────────────── registry ─────────────────────────
 
 export const TOOL_REGISTRY: readonly ToolSpec[] = [
@@ -693,6 +749,8 @@ export const TOOL_REGISTRY: readonly ToolSpec[] = [
   BATTERY_STATUS,
   LOCK_SCREEN,
   SCREENSHOT,
+  COMPOSE_EMAIL,
+  SEND_EMAIL,
 ] as const;
 
 export const TOOL_NAMES: readonly string[] = TOOL_REGISTRY.map((t) => t.name);

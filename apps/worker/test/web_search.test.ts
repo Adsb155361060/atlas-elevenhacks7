@@ -8,102 +8,84 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-describe('webSearch (Firecrawl backend)', () => {
-  it('POSTs to /v1/search with bearer auth + scrape options, normalises to {title, url, snippet}', async () => {
+/** A minimal Gemini `generateContent` response with grounding metadata. */
+function geminiResponse(text: string, sources: Array<{ uri: string; title?: string }>) {
+  return jsonResponse({
+    candidates: [
+      {
+        content: { parts: [{ text }] },
+        groundingMetadata: {
+          groundingChunks: sources.map((s) => ({ web: s })),
+        },
+        finishReason: 'STOP',
+      },
+    ],
+    modelVersion: 'gemini-2.5-flash',
+  });
+}
+
+describe('webSearch (Gemini + Google Search grounding)', () => {
+  it('POSTs to Gemini generateContent with the google_search tool and x-goog-api-key', async () => {
     const fetcher = async (input: RequestInfo | URL, init?: RequestInit) => {
-      expect(input.toString()).toBe('https://api.firecrawl.dev/v1/search');
+      expect(input.toString()).toContain(
+        '/v1beta/models/gemini-2.5-flash:generateContent',
+      );
       expect(init?.method).toBe('POST');
       const headers = new Headers(init?.headers ?? {});
-      expect(headers.get('authorization')).toBe('Bearer test-key');
+      expect(headers.get('x-goog-api-key')).toBe('test-key');
       const body = JSON.parse(String(init?.body ?? '{}'));
-      expect(body).toMatchObject({
-        query: 'lagos population',
-        limit: 5,
-      });
-      // SERP-only — no scrapeOptions (it caused Firecrawl rate-limit 429s).
-      expect(body.scrapeOptions).toBeUndefined();
-      return jsonResponse({
-        success: true,
-        data: [
+      expect(body.tools).toEqual([{ google_search: {} }]);
+      expect(body.contents[0].parts[0].text).toBe('latest news');
+      return geminiResponse('Top story today: markets rose two percent.', [
+        { uri: 'https://news.example.com/markets', title: 'Markets rise' },
+      ]);
+    };
+
+    const result = await webSearch('test-key', { query: 'latest news' }, fetcher);
+    expect(result.answer).toBe('Top story today: markets rose two percent.');
+    expect(result.results).toEqual([
+      { title: 'Markets rise', url: 'https://news.example.com/markets', snippet: '' },
+    ]);
+  });
+
+  it('joins multi-part answers and dedupes grounding sources', async () => {
+    const fetcher: typeof fetch = async () =>
+      jsonResponse({
+        candidates: [
           {
-            title: 'Lagos - Wikipedia',
-            url: 'https://en.wikipedia.org/wiki/Lagos',
-            markdown: 'Lagos is the largest city in Nigeria.\n\nIt has X people.',
-          },
-          {
-            title: 'Population Stats',
-            url: 'https://example.com/lagos',
-            description: 'Estimated 24 million metro.',
+            content: { parts: [{ text: 'Part one. ' }, { text: 'Part two.' }] },
+            groundingMetadata: {
+              groundingChunks: [
+                { web: { uri: 'https://a.com', title: 'A' } },
+                { web: { uri: 'https://a.com', title: 'A dup' } },
+                { web: { uri: 'https://b.com', title: 'B' } },
+              ],
+            },
           },
         ],
       });
-    };
-
-    const result = await webSearch('test-key', { query: 'lagos population' }, fetcher);
-    expect(result.results).toHaveLength(2);
-    expect(result.results[0]).toEqual({
-      title: 'Lagos - Wikipedia',
-      url: 'https://en.wikipedia.org/wiki/Lagos',
-      // Markdown content preferred over the SERP description.
-      snippet: 'Lagos is the largest city in Nigeria.\n\nIt has X people.',
-    });
-    // Falls back to description when markdown is absent.
-    expect(result.results[1]?.snippet).toBe('Estimated 24 million metro.');
+    const result = await webSearch('k', { query: 'q' }, fetcher);
+    expect(result.answer).toBe('Part one. Part two.');
+    expect(result.results.map((r) => r.url)).toEqual(['https://a.com', 'https://b.com']);
   });
 
-  it('clamps count to [1, 10]', async () => {
-    let captured: number | undefined;
-    const capture: typeof fetch = async (_input, init) => {
-      captured = JSON.parse(String(init?.body ?? '{}')).limit;
-      return jsonResponse({ success: true, data: [] });
-    };
-    await webSearch('k', { query: 'q', count: 50 }, capture);
-    expect(captured).toBe(10);
-    await webSearch('k', { query: 'q', count: 0 }, capture);
-    expect(captured).toBe(1);
+  it('clamps the number of sources returned to count [1, 10]', async () => {
+    const many = Array.from({ length: 12 }, (_, i) => ({
+      uri: `https://x/${i}`,
+      title: `r${i}`,
+    }));
+    const fetcher: typeof fetch = async () => geminiResponse('answer', many);
+    const three = await webSearch('k', { query: 'q', count: 3 }, fetcher);
+    expect(three.results).toHaveLength(3);
+    const clampedHigh = await webSearch('k', { query: 'q', count: 50 }, fetcher);
+    expect(clampedHigh.results).toHaveLength(10);
   });
 
-  it('clips results to requested count even if upstream returns more', async () => {
-    const fetcher: typeof fetch = async () =>
-      jsonResponse({
-        success: true,
-        data: Array.from({ length: 8 }, (_, i) => ({
-          title: `r${i}`,
-          url: `https://x/${i}`,
-          markdown: `s${i}`,
-        })),
-      });
-    const result = await webSearch('k', { query: 'x', count: 3 }, fetcher);
-    expect(result.results).toHaveLength(3);
-  });
-
-  it('truncates very long markdown snippets', async () => {
-    const big = 'a'.repeat(5000);
-    const fetcher: typeof fetch = async () =>
-      jsonResponse({
-        success: true,
-        data: [{ title: 't', url: 'https://x', markdown: big }],
-      });
-    const result = await webSearch('k', { query: 'x' }, fetcher);
-    const snippet = result.results[0]?.snippet ?? '';
-    expect(snippet.length).toBeLessThanOrEqual(601); // 600 + ellipsis char
-    expect(snippet.endsWith('…')).toBe(true);
-  });
-
-  it('strips simple HTML tags from fallback descriptions', async () => {
-    const fetcher: typeof fetch = async () =>
-      jsonResponse({
-        success: true,
-        data: [
-          {
-            title: 't',
-            url: 'https://x',
-            description: 'a <b>bold</b> and <em>emphatic</em> result',
-          },
-        ],
-      });
-    const result = await webSearch('k', { query: 'x' }, fetcher);
-    expect(result.results[0]?.snippet).toBe('a bold and emphatic result');
+  it('tolerates an answer with no grounding sources', async () => {
+    const fetcher: typeof fetch = async () => geminiResponse('A plain answer.', []);
+    const result = await webSearch('k', { query: 'q' }, fetcher);
+    expect(result.answer).toBe('A plain answer.');
+    expect(result.results).toEqual([]);
   });
 
   it('rejects empty query', async () => {
@@ -120,18 +102,21 @@ describe('webSearch (Firecrawl backend)', () => {
     });
   });
 
-  it('throws when upstream reports success=false', async () => {
+  it('throws when Gemini returns an error object', async () => {
     const fetcher: typeof fetch = async () =>
-      jsonResponse({ success: false, error: 'over quota' });
+      jsonResponse({ error: { message: 'quota exceeded', code: 429 } });
     await expect(webSearch('k', { query: 'q' }, fetcher)).rejects.toMatchObject({
       name: 'BraveSearchError',
       status: 502,
     });
   });
 
-  it('handles missing data array gracefully', async () => {
-    const fetcher: typeof fetch = async () => jsonResponse({ success: true });
-    const result = await webSearch('k', { query: 'q' }, fetcher);
-    expect(result.results).toEqual([]);
+  it('throws when Gemini returns no text', async () => {
+    const fetcher: typeof fetch = async () =>
+      jsonResponse({ candidates: [{ content: { parts: [] } }] });
+    await expect(webSearch('k', { query: 'q' }, fetcher)).rejects.toMatchObject({
+      name: 'BraveSearchError',
+      status: 502,
+    });
   });
 });

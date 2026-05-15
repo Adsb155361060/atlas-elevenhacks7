@@ -1,43 +1,35 @@
 /**
- * Firecrawl `/v1/search` proxy. Translates `{query, count?}` to Firecrawl's
- * search endpoint and normalises the response to our internal shape:
- *   `{results: [{title, url, snippet}]}`.
+ * `web_search` — current-events answers via Gemini + Google Search grounding.
  *
- * SERP-only — no `scrapeOptions`. We originally asked Firecrawl to *scrape*
- * the top N pages too (richer article-body snippets), but that costs 1 + N
- * credits per call and scrapes N pages serially, so a voice session that
- * runs a few searches blew straight through Firecrawl's rate limit and the
- * agent got HTTP 429 ("unable to fetch the news right now"). Plain search is
- * 1 credit, returns in well under a second, and the SERP title+description
- * is plenty for a spoken summary.
+ * No third-party search API. We hand the query to Gemini's `generateContent`
+ * with the built-in `google_search` tool enabled: Gemini runs the searches,
+ * reads the results, and returns a synthesised answer plus `groundingMetadata`
+ * listing the web sources it used.
  *
- * Reference: https://docs.firecrawl.dev/api-reference/endpoint/search
+ * Why this replaced Firecrawl: Firecrawl's `/v1/search` rate-limited a normal
+ * voice session within a handful of calls (HTTP 429 → "unable to fetch the
+ * news right now"), and it billed per scraped page. Google Search grounding
+ * shares the GEMINI_API_KEY the rest of the worker already uses, has no extra
+ * quota to exhaust, and returns an answer that's already shaped for the ear.
+ *
+ * Reference: https://ai.google.dev/gemini-api/docs/google-search
  */
 
-const FIRECRAWL_SEARCH_ENDPOINT = 'https://api.firecrawl.dev/v1/search';
+/** Same Gemini Flash family the chat + vision paths use. */
+const SEARCH_MODEL = 'gemini-2.5-flash';
 
-/** How much of each scraped page we feed back to the agent. Firecrawl can
- *  return tens of kilobytes per result; the conversational LLM doesn't need
- *  that much, and a long prompt hurts latency for a voice loop. 600 chars
- *  is roughly a tight paragraph — enough for grounded answers without
- *  pushing the post-tool LLM call past ElevenLabs's orchestrator timeout
- *  on top of however many tool calls Gemini decides to chain. */
-const SNIPPET_MAX_CHARS = 600;
+/** Trim each source title we hand back for on-screen display. */
+const TITLE_MAX_CHARS = 120;
 
-interface FirecrawlSearchResult {
-  title?: string;
-  url?: string;
-  description?: string;
-  markdown?: string;
-  content?: string;
-}
+const SYSTEM_PROMPT =
+  "You are the web-search module of a voice-first assistant called Atlas. " +
+  "Use Google Search to answer the user's query with current, factual information. " +
+  "Reply in two to four short sentences meant to be read aloud — no markdown, " +
+  "no bullet points, no URLs, no citations in the text. Lead with the single most " +
+  "important fact. If it's a news query, give the top headlines in plain prose. " +
+  "If the search turns up nothing useful, say so plainly.";
 
-interface FirecrawlSearchResponse {
-  success?: boolean;
-  data?: FirecrawlSearchResult[];
-  error?: string;
-}
-
+/** A grounding source Gemini used to answer. */
 export interface SearchResult {
   title: string;
   url: string;
@@ -45,6 +37,9 @@ export interface SearchResult {
 }
 
 export interface SearchResponse {
+  /** Synthesised, voice-ready answer — the agent reads this aloud. */
+  answer: string;
+  /** Web sources behind the answer — for on-screen display / artifacts. */
   results: SearchResult[];
 }
 
@@ -53,8 +48,8 @@ export interface SearchInput {
   count?: number;
 }
 
-// Public name kept (and re-exported) for callers / tests. It's no longer
-// strictly a Brave error, but stable surface beats churn.
+// Public name kept (and re-exported) for callers / tests across the Brave →
+// Firecrawl → Gemini migrations. Stable surface beats churn.
 export class BraveSearchError extends Error {
   constructor(
     public status: number,
@@ -66,10 +61,24 @@ export class BraveSearchError extends Error {
   }
 }
 
+interface GeminiGroundingChunk {
+  web?: { uri?: string; title?: string };
+}
+
+interface GeminiSearchResponse {
+  candidates?: Array<{
+    content?: { parts?: Array<{ text?: string }> };
+    groundingMetadata?: { groundingChunks?: GeminiGroundingChunk[] };
+    finishReason?: string;
+  }>;
+  modelVersion?: string;
+  error?: { message?: string; code?: number; status?: string };
+}
+
 /**
- * Call Firecrawl Search. `apiKey` is the Firecrawl bearer token; the caller
- * passes it explicitly so this module can be unit-tested without Cloudflare
- * bindings. `fetcher` defaults to the global `fetch`; pass a stub in tests.
+ * Run a grounded web search. `apiKey` is the Gemini API key; the caller passes
+ * it explicitly so this module is unit-testable without Cloudflare bindings.
+ * `fetcher` defaults to global `fetch`; pass a stub in tests.
  */
 export async function webSearch(
   apiKey: string,
@@ -81,53 +90,82 @@ export async function webSearch(
   }
   const limit = clampCount(input.count);
 
-  const resp = await fetcher(FIRECRAWL_SEARCH_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      accept: 'application/json',
-      'content-type': 'application/json',
-      authorization: `Bearer ${apiKey}`,
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(
+    SEARCH_MODEL,
+  )}:generateContent`;
+
+  const body = {
+    contents: [{ role: 'user', parts: [{ text: input.query.trim() }] }],
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    // The built-in grounding tool — Gemini decides what to search for.
+    tools: [{ google_search: {} }],
+    generationConfig: {
+      temperature: 0.3,
+      // Headroom for Gemini's thinking-token budget so the visible answer
+      // isn't truncated by `finishReason: "length"`.
+      maxOutputTokens: 2048,
     },
-    body: JSON.stringify({
-      query: input.query.trim(),
-      limit,
-    }),
-  });
+  };
+
+  let resp: Response;
+  try {
+    resp = await fetcher(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-goog-api-key': apiKey,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch (err) {
+    throw new BraveSearchError(502, `gemini search network: ${(err as Error).message}`);
+  }
 
   if (!resp.ok) {
-    const body = await resp.text().catch(() => '');
+    const errText = await resp.text().catch(() => '');
     throw new BraveSearchError(
       resp.status,
-      `firecrawl search ${resp.status}: ${body.slice(0, 200)}`,
-      body,
+      `gemini search ${resp.status}: ${errText.slice(0, 200)}`,
+      errText,
     );
   }
-  const json = (await resp.json()) as FirecrawlSearchResponse;
-  if (json.success === false) {
-    throw new BraveSearchError(
-      502,
-      `firecrawl search reported failure: ${json.error ?? 'unknown error'}`,
-    );
+
+  const json = (await resp.json()) as GeminiSearchResponse;
+  if (json.error) {
+    throw new BraveSearchError(502, `gemini search: ${json.error.message ?? 'unknown error'}`);
   }
-  const raw = Array.isArray(json.data) ? json.data : [];
-  const results: SearchResult[] = raw.slice(0, limit).map((r) => ({
-    title: (r.title ?? '').trim(),
-    url: (r.url ?? '').trim(),
-    snippet: extractSnippet(r),
-  }));
-  return { results };
+
+  const candidate = (json.candidates ?? [])[0];
+  const answer = (candidate?.content?.parts ?? [])
+    .map((p) => p.text ?? '')
+    .join('')
+    .trim();
+  if (!answer) {
+    throw new BraveSearchError(502, 'gemini search returned no text');
+  }
+
+  // Map the grounding sources to our `results` shape for on-screen display.
+  const chunks = candidate?.groundingMetadata?.groundingChunks ?? [];
+  const seen = new Set<string>();
+  const results: SearchResult[] = [];
+  for (const ch of chunks) {
+    const u = (ch.web?.uri ?? '').trim();
+    if (!u || seen.has(u)) continue;
+    seen.add(u);
+    results.push({
+      title: clampTitle(ch.web?.title ?? u),
+      url: u,
+      snippet: '',
+    });
+    if (results.length >= limit) break;
+  }
+
+  return { answer, results };
 }
 
-function extractSnippet(r: FirecrawlSearchResult): string {
-  // Prefer the scraped page content (cleaned markdown) over the SERP
-  // description — agents do meaningfully better with article body text.
-  const md = (r.markdown ?? r.content ?? '').trim();
-  if (md.length > 0) {
-    return md.length > SNIPPET_MAX_CHARS
-      ? md.slice(0, SNIPPET_MAX_CHARS).trimEnd() + '…'
-      : md;
-  }
-  return (r.description ?? '').replace(/<\/?[^>]+>/g, '').trim();
+function clampTitle(t: string): string {
+  const s = t.trim();
+  return s.length > TITLE_MAX_CHARS ? s.slice(0, TITLE_MAX_CHARS).trimEnd() + '…' : s;
 }
 
 function clampCount(input: number | undefined): number {

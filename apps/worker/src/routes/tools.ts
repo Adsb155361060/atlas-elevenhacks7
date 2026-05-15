@@ -53,15 +53,14 @@ const WebSearchBody = z.object({
 });
 
 tools.post('/web_search', async (c) => {
-  // Prefer Firecrawl (current backend). BRAVE_SEARCH_API_KEY stays read for
-  // back-compat but isn't required.
-  const searchKey = c.env.FIRECRAWL_API_KEY ?? c.env.BRAVE_SEARCH_API_KEY;
+  // web_search runs on Gemini + Google Search grounding — same GEMINI_API_KEY
+  // the chat and vision paths use, no separate search-API quota to exhaust.
+  const searchKey = c.env.GEMINI_API_KEY;
   if (!searchKey) {
     return c.json(
       {
         error: {
-          message:
-            'FIRECRAWL_API_KEY not configured on the worker — wrangler secret put',
+          message: 'GEMINI_API_KEY not configured on the worker — wrangler secret put',
           type: 'configuration_error',
         },
       },

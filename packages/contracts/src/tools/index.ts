@@ -393,7 +393,7 @@ const GENERATE_IMAGE: ToolSpec = {
 const RENDER_ARTIFACT: ToolSpec = {
   name: 'render_artifact',
   description:
-    "Show the user a visual artifact in the Atlas main window (map, chart, list, image, code, markdown, table, search_results, tutorial). Use it alongside your spoken reply — the screen carries detail your voice shouldn't. Don't read the artifact aloud, just acknowledge what's appearing.",
+    "Show the user a visual artifact in the Atlas main window (map, chart, list, image, code, markdown, table, search_results, tutorial). Use it alongside your spoken reply — the screen carries detail your voice shouldn't. Don't read the artifact aloud, just acknowledge what's appearing.\n\nITERATIVE REFINEMENT: when the user refines an existing artifact ('zoom in', 'now in red', 'add the tube stations', 'sort by date'), call render_artifact AGAIN with the SAME `id` you used the first time and the FULL new data. The desktop versions the artifact in place — the user sees a smooth update, not a fresh render. Pass a new (or omitted) `id` only for a genuinely new artifact.",
   location: 'desktop',
   confirm_required: false,
   params: {
@@ -416,7 +416,7 @@ const RENDER_ARTIFACT: ToolSpec = {
       },
       data: {
         type: 'object',
-        description: 'Type-specific payload. The renderer decides the shape.',
+        description: 'Type-specific payload — the full state of the artifact. The renderer decides the shape.',
         properties: {},
         additionalProperties: true,
       },
@@ -424,6 +424,11 @@ const RENDER_ARTIFACT: ToolSpec = {
         type: 'string',
         description:
           "Optional one-sentence label of what's appearing — falls back to the renderer's default if omitted.",
+      },
+      id: {
+        type: 'string',
+        description:
+          "Stable id for cross-turn iteration. Pick a short, descriptive slug the FIRST time you show an artifact (e.g. 'london-map', 'covid-rates-chart'), then reuse the SAME id on every follow-up that refines it. Omit only for a brand-new, unrelated artifact.",
       },
     },
     required: ['type', 'data'],

@@ -36,6 +36,13 @@ struct RenderInput {
     data: Value,
     #[serde(default)]
     narration: Option<String>,
+    /// Stable identifier so the agent can *iterate* on an artifact across
+    /// turns ("now in red", "zoom in"). When the same `id` arrives again
+    /// the frontend bumps the version and animates between renders instead
+    /// of mounting a fresh component. Omit (or pass a new id) for a
+    /// genuinely new artifact.
+    #[serde(default)]
+    id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -43,6 +50,10 @@ pub struct ArtifactEvent {
     pub kind: String,
     pub data: Value,
     pub narration: Option<String>,
+    /// Optional caller-supplied id — the frontend's `useArtifact.ingest`
+    /// uses this to detect "same artifact, next version". `None` means a
+    /// brand-new artifact and the frontend will mint a local id.
+    pub id: Option<String>,
     /// Millis since UNIX epoch when the artifact was received — useful for
     /// the frontend's "render newest" tiebreaker if two arrive close together.
     pub received_at: u128,
@@ -66,6 +77,11 @@ pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult
         kind: parsed.kind,
         data: parsed.data,
         narration: parsed.narration,
+        id: parsed
+            .id
+            .as_ref()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty()),
         received_at: std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis())
@@ -77,9 +93,13 @@ pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult
     }
 
     log::info!(
-        "render_artifact: kind={} narration={:?}",
+        "render_artifact: kind={} id={:?} narration={:?}",
         event.kind,
+        event.id,
         event.narration
     );
-    ToolResult::ok(serde_json::json!({ "rendered": true }))
+    ToolResult::ok(serde_json::json!({
+        "rendered": true,
+        "id": event.id,
+    }))
 }

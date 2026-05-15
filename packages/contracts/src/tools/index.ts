@@ -727,6 +727,64 @@ const SEND_EMAIL: ToolSpec = {
   },
 };
 
+const TYPE_TEXT: ToolSpec = {
+  name: 'type_text',
+  description:
+    "Type text into whatever the user has keyboard focus on (an email reply, a chat box, a search bar, a text field). Phase 4 voice-driven app operation — the user puts focus where they want, then says what to type. Always read the text back in one sentence and CONFIRM aloud before calling; typing into the wrong window is hard to undo. Use this for composing or dictating, NOT for triggering app commands (use press_key for shortcuts like cmd+s).",
+  location: 'desktop',
+  confirm_required: true,
+  params: {
+    type: 'object',
+    properties: {
+      text: { type: 'string', description: 'The text to type. Newlines are typed as Enter presses.' },
+      press_enter: {
+        type: 'boolean',
+        description: "Press Enter after typing — handy for 'type and send this message'. Defaults to false.",
+      },
+    },
+    required: ['text'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      typed: { type: 'boolean' },
+      chars: { type: 'integer' },
+    },
+    required: ['typed'],
+    additionalProperties: false,
+  },
+};
+
+const PRESS_KEY: ToolSpec = {
+  name: 'press_key',
+  description:
+    "Send a keyboard shortcut to whatever has focus. Phase 4 voice-driven app operation: 'save this' → press_key cmd+s, 'close this tab' → cmd+w, 'switch apps' → alt+tab, 'submit the form' → enter. Notation: 'mod+mod+key' (e.g. 'cmd+s', 'ctrl+shift+t', 'alt+f4', 'enter', 'f5'). 'cmd' means the primary accelerator — ⌘ on macOS, Ctrl on Windows/Linux. Confirm aloud before destructive shortcuts (cmd+q quit, alt+f4 close, cmd+w close).",
+  location: 'desktop',
+  confirm_required: true,
+  params: {
+    type: 'object',
+    properties: {
+      keys: {
+        type: 'string',
+        description:
+          "Shortcut in 'mod+mod+key' notation. Modifiers: cmd, ctrl, alt, shift, super. Keys: a letter/digit, or named (enter, tab, space, escape, backspace, delete, home, end, pageup, pagedown, up, down, left, right, insert, f1-f24).",
+      },
+    },
+    required: ['keys'],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      pressed: { type: 'boolean' },
+      keys: { type: 'string' },
+    },
+    required: ['pressed'],
+    additionalProperties: false,
+  },
+};
+
 // ───────────────────────── registry ─────────────────────────
 
 export const TOOL_REGISTRY: readonly ToolSpec[] = [
@@ -751,6 +809,8 @@ export const TOOL_REGISTRY: readonly ToolSpec[] = [
   SCREENSHOT,
   COMPOSE_EMAIL,
   SEND_EMAIL,
+  TYPE_TEXT,
+  PRESS_KEY,
 ] as const;
 
 export const TOOL_NAMES: readonly string[] = TOOL_REGISTRY.map((t) => t.name);

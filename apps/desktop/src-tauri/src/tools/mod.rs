@@ -22,11 +22,13 @@ mod lock_screen;
 mod music_control;
 mod notes;
 mod open_path;
+mod press_key;
 mod render_artifact;
 mod screenshot;
 mod send_email;
 mod system_action;
 mod timer;
+mod type_text;
 pub mod vision_qa;
 
 use serde::{Deserialize, Serialize};
@@ -78,6 +80,8 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, name: &str, parameters: &Value) 
         "screenshot" => screenshot::execute(app, parameters),
         "compose_email" => compose_email::execute(app, parameters),
         "send_email" => send_email::execute(app, parameters),
+        "type_text" => type_text::execute(app, parameters),
+        "press_key" => press_key::execute(app, parameters),
         other => ToolResult::err(format!(
             "tool '{other}' is not implemented on the desktop client (Phase 1.x)"
         )),

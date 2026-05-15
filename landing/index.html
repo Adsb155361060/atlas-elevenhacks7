@@ -225,8 +225,35 @@
     }
     .btn .glyph { font-size: 13px; line-height: 1; }
 
+    .hero-install-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 20px;
+      padding: 10px 16px;
+      border: 1px solid var(--hair-strong);
+      border-left: 2px solid var(--brass);
+      background: rgba(20, 17, 14, 0.55);
+      text-decoration: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--cream-dim);
+      transition: all 200ms ease;
+    }
+    .hero-install-link:hover {
+      border-color: var(--brass);
+      background: rgba(20, 17, 14, 0.8);
+    }
+    .hero-install-link-cta {
+      color: var(--brass);
+      font-weight: 500;
+    }
+    .hero-install-link:hover .hero-install-link-cta { color: var(--brass-glow); }
+
     .hero-tip {
-      margin-top: 28px;
+      margin-top: 22px;
       font-family: var(--font-mono);
       font-size: 10px;
       letter-spacing: 0.18em;
@@ -785,6 +812,10 @@
             <span>Download for Windows</span>
           </a>
         </div>
+        <a class="hero-install-link" href="#install">
+          First time on this machine?
+          <span class="hero-install-link-cta">Read the install &amp; permissions guide&nbsp;→</span>
+        </a>
         <p class="hero-tip">
           Wake word <kbd>Hey Atlas</kbd> &nbsp;·&nbsp; push-to-talk <kbd>⌘</kbd><kbd>⇧</kbd><kbd>A</kbd>
         </p>

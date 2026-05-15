@@ -96,7 +96,7 @@ pub fn execute<R: Runtime>(app: &AppHandle<R>, parameters: &Value) -> ToolResult
 // ───────────────────────── screen capture per OS ─────────────────────────
 
 #[cfg(target_os = "macos")]
-fn capture_screen() -> Result<Vec<u8>> {
+pub(crate) fn capture_screen() -> Result<Vec<u8>> {
     let output = Command::new("/usr/sbin/screencapture")
         .arg("-x")
         .arg("-t")
@@ -115,7 +115,7 @@ fn capture_screen() -> Result<Vec<u8>> {
 }
 
 #[cfg(target_os = "linux")]
-fn capture_screen() -> Result<Vec<u8>> {
+pub(crate) fn capture_screen() -> Result<Vec<u8>> {
     if let Ok(out) = Command::new("grim").arg("-").output() {
         if out.status.success() && !out.stdout.is_empty() {
             return Ok(out.stdout);
@@ -132,7 +132,7 @@ fn capture_screen() -> Result<Vec<u8>> {
 }
 
 #[cfg(target_os = "windows")]
-fn capture_screen() -> Result<Vec<u8>> {
+pub(crate) fn capture_screen() -> Result<Vec<u8>> {
     // No `screencapture`/`grim` equivalent ships with Windows, but every
     // Windows box has PowerShell + System.Drawing. Capture the whole virtual
     // screen (all monitors) to a temp PNG, read it back, delete it. We go via
@@ -171,7 +171,7 @@ fn capture_screen() -> Result<Vec<u8>> {
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
-fn capture_screen() -> Result<Vec<u8>> {
+pub(crate) fn capture_screen() -> Result<Vec<u8>> {
     Err(anyhow!("vision_qa: unsupported platform"))
 }
 

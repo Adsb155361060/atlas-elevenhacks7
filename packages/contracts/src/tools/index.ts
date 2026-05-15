@@ -599,6 +599,73 @@ const SYSTEM_ACTION: ToolSpec = {
   },
 };
 
+const BATTERY_STATUS: ToolSpec = {
+  name: 'battery_status',
+  description:
+    "Report the machine's battery charge level and whether it's plugged in. Use when the user asks 'what's my battery', 'am I charging', 'how much battery do I have left'. Desktops with no battery return present:false — say so plainly.",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {},
+    required: [],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      present: { type: 'boolean', description: 'False on desktops with no battery.' },
+      percent: { type: 'number', description: 'Charge 0-100, or null if unreadable.' },
+      charging: { type: 'boolean', description: 'True when on AC power / charging.' },
+    },
+    required: ['present', 'charging'],
+    additionalProperties: false,
+  },
+};
+
+const LOCK_SCREEN: ToolSpec = {
+  name: 'lock_screen',
+  description:
+    "Lock the workstation immediately. Use when the user says 'lock my screen', 'lock the computer', 'I'm stepping away'. Speak a one-sentence confirmation aloud BEFORE calling this — it's disruptive and immediate.",
+  location: 'desktop',
+  confirm_required: true,
+  params: {
+    type: 'object',
+    properties: {},
+    required: [],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: { locked: { type: 'boolean' } },
+    required: ['locked'],
+    additionalProperties: false,
+  },
+};
+
+const SCREENSHOT: ToolSpec = {
+  name: 'screenshot',
+  description:
+    "Capture the whole screen to a PNG file saved in the user's Pictures folder. Use when the user says 'take a screenshot', 'capture my screen', 'save a picture of this'. Returns the saved file path — read it back so the user knows where it landed. (To answer a question ABOUT the screen instead, use vision_qa.)",
+  location: 'desktop',
+  confirm_required: false,
+  params: {
+    type: 'object',
+    properties: {},
+    required: [],
+    additionalProperties: false,
+  },
+  returns: {
+    type: 'object',
+    properties: {
+      saved: { type: 'boolean' },
+      path: { type: 'string', description: 'Absolute path of the saved PNG.' },
+    },
+    required: ['saved'],
+    additionalProperties: false,
+  },
+};
+
 // ───────────────────────── registry ─────────────────────────
 
 export const TOOL_REGISTRY: readonly ToolSpec[] = [
@@ -618,6 +685,9 @@ export const TOOL_REGISTRY: readonly ToolSpec[] = [
   WRITE_CLIPBOARD,
   SET_TIMER,
   CALENDAR_TODAY,
+  BATTERY_STATUS,
+  LOCK_SCREEN,
+  SCREENSHOT,
 ] as const;
 
 export const TOOL_NAMES: readonly string[] = TOOL_REGISTRY.map((t) => t.name);

@@ -12,14 +12,17 @@
 //! paired with on-screen detail. Phase 1.2–1.6 add `launch_app`,
 //! `music_control`, `open_path`, `find_files`, `system_action`.
 
+mod battery_status;
 mod calendar;
 mod clipboard;
 mod find_files;
 mod launch_app;
+mod lock_screen;
 mod music_control;
 mod notes;
 mod open_path;
 mod render_artifact;
+mod screenshot;
 mod system_action;
 mod timer;
 pub mod vision_qa;
@@ -68,6 +71,9 @@ pub fn dispatch<R: Runtime>(app: &AppHandle<R>, name: &str, parameters: &Value) 
         "write_clipboard" => clipboard::write_execute(app, parameters),
         "set_timer" => timer::execute(app, parameters),
         "calendar_today" => calendar::execute(app, parameters),
+        "battery_status" => battery_status::execute(app, parameters),
+        "lock_screen" => lock_screen::execute(app, parameters),
+        "screenshot" => screenshot::execute(app, parameters),
         other => ToolResult::err(format!(
             "tool '{other}' is not implemented on the desktop client (Phase 1.x)"
         )),

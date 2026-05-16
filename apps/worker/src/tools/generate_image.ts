@@ -1,18 +1,25 @@
 /**
- * Gemini Imagen 3 proxy.
+ * Gemini Imagen proxy.
  *
- * `POST https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict`
+ * `POST https://generativelanguage.googleapis.com/v1beta/models/<model>:predict`
  * returns base64-encoded PNG bytes. We wrap them in a `data:image/png;base64,…`
  * URI for the desktop's `<img>` renderer.
  *
+ * Model: `imagen-4.0-fast-generate-001` — chosen for voice-loop latency.
+ * Standard `imagen-4.0-generate-001` and `imagen-4.0-ultra-generate-001` are
+ * also available; fast trades a touch of quality for ~2s shorter wall time,
+ * which matters when the agent is mid-conversation.
+ *
  * Why Gemini Imagen (not OpenAI gpt-image-1 or DALL-E):
- * - The user already has `GEMINI_API_KEY` configured for Phase 11 fallback.
- * - Imagen 3 is fast (~3-5s) and produces high-quality PNGs.
+ * - GEMINI_API_KEY is already configured for the chat + vision paths.
  * - Free tier covers demo usage.
+ *
+ * History: this used to call `imagen-3.0-generate-002`; Google retired that
+ * model on the v1beta endpoint (404 on every call) — replaced with Imagen 4.
  */
 
-const ENDPOINT_PREFIX =
-  'https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict';
+const IMAGE_MODEL = 'imagen-4.0-fast-generate-001';
+const ENDPOINT_PREFIX = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_MODEL}:predict`;
 
 export class ImageGenError extends Error {
   constructor(
